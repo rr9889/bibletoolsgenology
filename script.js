@@ -5,7 +5,7 @@ const RELATIONSHIP_FILE = './BibleData-PersonRelationship.json';
 const PERSONVERSE_FILE = './BibleData-PersonVerse.json';
 const PERSONVERSE_TANAKH_FILE = './BibleData-PersonVerse-Tanakh.json';
 const PERSONVERSE_APOSTOLIC_FILE = './BibleData-PersonVerse-Apostolic.json';
-const BIBLEDATA_PERSON_FILE = './BibleData-PersonVerse.json'; // Assuming this is the same as PERSONVERSE_FILE or a subset
+const BIBLEDATA_PERSON_FILE = './BibleData-PersonVerse.json';
 
 // Data storage
 let peopleData = [];
@@ -18,7 +18,6 @@ const peopleCache = new Map();
 initApp();
 
 async function initApp() {
-  // Load all JSON files
   const [personData, labelDataResult, relationshipDataResult, personVerseDataResult, personVerseTanakhData, personVerseApostolicData, bibleDataPersonResult] = await Promise.all([
     loadJSONData(PERSON_FILE),
     loadJSONData(LABEL_FILE),
@@ -100,13 +99,20 @@ async function fetchPersonDetails(person) {
     return;
   }
 
-  // Normalize person_id for case-insensitive matching
   const personIdLower = person.person_id.toLowerCase();
   const personLabels = labelData.filter(label => label.person_id.toLowerCase() === personIdLower);
   const personRelationships = relationshipData.filter(rel => 
     rel.person_id_1.toLowerCase() === personIdLower || rel.person_id_2.toLowerCase() === personIdLower
   );
   const personVerses = personVerseData.filter(pv => pv.person_id.toLowerCase() === personIdLower);
+
+  // Find children from relationships (in addition to father/mother fields)
+  const childrenFromRelationships = personRelationships
+    .filter(rel => rel.person_id_1.toLowerCase() === personIdLower && (rel.relationship_type === 'father' || rel.relationship_type === 'mother'))
+    .map(rel => {
+      const child = peopleData.find(p => p.person_id.toLowerCase() === rel.person_id_2.toLowerCase());
+      return child ? child.person_name : rel.person_id_2;
+    });
 
   const combinedPerson = {
     person_name: person.person_name,
@@ -122,7 +128,7 @@ async function fetchPersonDetails(person) {
     mother: person.mother || 'Not listed',
     firstVerse: person.firstVerse || 'Not listed',
     lastVerse: person.lastVerse || 'Not listed',
-    children: findChildren(person.person_name),
+    children: [...new Set([...findChildren(person.person_name), ...childrenFromRelationships])], // Combine children from both sources
     labels: personLabels,
     relationships: personRelationships,
     verses: personVerses
@@ -132,7 +138,7 @@ async function fetchPersonDetails(person) {
   showPersonDetails(combinedPerson);
 }
 
-// Find children
+// Find children from BibleData-Person.json
 function findChildren(name) {
   return peopleData
     .filter(p => (p.father || '').toLowerCase() === name.toLowerCase() || (p.mother || '').toLowerCase() === name.toLowerCase())
@@ -209,19 +215,20 @@ function showPersonDetails(person) {
 
   // Verses mentioned (collapsible) with Tanakh/Apostolic distinction
   if (person.verses && person.verses.length > 0) {
-    // Separate Tanakh and Apostolic verses
-    const tanakhVerses = person.verses.filter(v => v.reference_id.startsWith('GEN') || v.reference_id.startsWith('EXO') /* Add more Tanakh books */);
-    const apostolicVerses = person.verses.filter(v => v.reference_id.startsWith('MAT') || v.reference_id.startsWith('MAR') /* Add more Apostolic books */);
+    // Sort verses by person_verse_sequence
+    const sortedVerses = person.verses.sort((a, b) => parseInt(a.person_verse_sequence) - parseInt(b.person_verse_sequence));
+    const tanakhVerses = sortedVerses.filter(v => v.reference_id.startsWith('GEN') || v.reference_id.startsWith('EXO') /* Add more Tanakh books */);
+    const apostolicVerses = sortedVerses.filter(v => v.reference_id.startsWith('MAT') || v.reference_id.startsWith('MAR') || v.reference_id.startsWith('1CO') /* Add more Apostolic books */);
 
     profileHTML += `
-      <h3><button class="collapsible">Verses Mentioned (${person.verses.length})</button></h3>
+      <h3><button class="collapsible">Verses Mentioned (${sortedVerses.length})</button></h3>
       <div class="collapsible-content">
     `;
 
     if (tanakhVerses.length > 0) {
       profileHTML += `
         <h4>Tanakh (${tanakhVerses.length})</h4>
-        <ul>
+        <ul class="tanakh">
       `;
       tanakhVerses.forEach(verse => {
         profileHTML += `
@@ -237,7 +244,7 @@ function showPersonDetails(person) {
     if (apostolicVerses.length > 0) {
       profileHTML += `
         <h4>Apostolic Writings (${apostolicVerses.length})</h4>
-        <ul>
+        <ul class="apostolic">
       `;
       apostolicVerses.forEach(verse => {
         profileHTML += `
