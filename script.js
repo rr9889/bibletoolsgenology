@@ -40,6 +40,12 @@ async function initApp() {
     ...bibleDataPersonResult
   ].filter(entry => entry.person_id !== "NA");
 
+  // Debug: Log the number of entries loaded
+  console.log('People Data:', peopleData.length, 'entries');
+  console.log('Label Data:', labelData.length, 'entries');
+  console.log('Relationship Data:', relationshipData.length, 'entries');
+  console.log('Person Verse Data:', personVerseData.length, 'entries');
+
   setupSearch();
 }
 
@@ -48,7 +54,9 @@ async function loadJSONData(file) {
   try {
     const response = await fetch(file);
     if (!response.ok) throw new Error(`Failed to fetch ${file}: ${response.statusText}`);
-    return await response.json();
+    const data = await response.json();
+    console.log(`Loaded ${file}:`, data.length, 'entries');
+    return data;
   } catch (err) {
     console.error(err);
     return [];
@@ -99,14 +107,39 @@ async function fetchPersonDetails(person) {
     return;
   }
 
-  const personIdLower = person.person_id.toLowerCase();
-  const personLabels = labelData.filter(label => label.person_id.toLowerCase() === personIdLower);
-  const personRelationships = relationshipData.filter(rel => 
-    rel.person_id_1.toLowerCase() === personIdLower || rel.person_id_2.toLowerCase() === personIdLower
-  );
-  const personVerses = personVerseData.filter(pv => pv.person_id.toLowerCase() === personIdLower);
+  console.log('Fetching details for:', person.person_name, 'with person_id:', person.person_id);
 
-  // Find children from relationships (in addition to father/mother fields)
+  const personIdLower = person.person_id.toLowerCase();
+  const personLabels = labelData.filter(label => {
+    const match = label.person_id.toLowerCase() === personIdLower;
+    if (person.person_name === 'Moses' && !match) {
+      console.log('Label mismatch for Moses:', label.person_id);
+    }
+    return match;
+  });
+  const personRelationships = relationshipData.filter(rel => {
+    const match = rel.person_id_1.toLowerCase() === personIdLower || rel.person_id_2.toLowerCase() === personIdLower;
+    if (person.person_name === 'Moses' && !match) {
+      console.log('Relationship mismatch for Moses:', rel.person_id_1, rel.person_id_2);
+    }
+    return match;
+  });
+  const personVerses = personVerseData.filter(pv => {
+    const match = pv.person_id.toLowerCase() === personIdLower;
+    if (person.person_name === 'Moses' && !match) {
+      console.log('Verse mismatch for Moses:', pv.person_id);
+    }
+    return match;
+  });
+
+  // Debug: Log the data found for Moses
+  if (person.person_name === 'Moses') {
+    console.log('Labels for Moses:', personLabels);
+    console.log('Relationships for Moses:', personRelationships);
+    console.log('Verses for Moses:', personVerses);
+  }
+
+  // Find children from relationships
   const childrenFromRelationships = personRelationships
     .filter(rel => rel.person_id_1.toLowerCase() === personIdLower && (rel.relationship_type === 'father' || rel.relationship_type === 'mother'))
     .map(rel => {
@@ -128,7 +161,7 @@ async function fetchPersonDetails(person) {
     mother: person.mother || 'Not listed',
     firstVerse: person.firstVerse || 'Not listed',
     lastVerse: person.lastVerse || 'Not listed',
-    children: [...new Set([...findChildren(person.person_name), ...childrenFromRelationships])], // Combine children from both sources
+    children: [...new Set([...findChildren(person.person_name), ...childrenFromRelationships])],
     labels: personLabels,
     relationships: personRelationships,
     verses: personVerses
@@ -176,7 +209,7 @@ function showPersonDetails(person) {
       profileHTML += `
         <li>
           <strong>${label.english_label}</strong> (${label.label_type})<br>
-          <strong>Hebrew:</strong> ${label.hebrew_label} (${label.hebrew_label_transliterated}) - ${label.hebrew_label_meaning || 'No meaning provided'} [Strong's ${label.hebrew_strongs_number || 'N/A'}]<br>
+          <strong>Hebrew:</strong> ${label.hebrew_label} (${label.hebrew_label_transliterated}) -b> - ${label.hebrew_label_meaning || 'No meaning provided'} [Strong's ${label.hebrew_strongs_number || 'N/A'}]<br>
           <strong>Greek:</strong> ${label.greek_label} (${label.greek_label_transliterated}) - ${label.greek_label_meaning || 'No meaning provided'} [Strong's ${label.greek_strongs_number || 'N/A'}]<br>
           <strong>Reference:</strong> ${label.label_reference_id}<br>
           <strong>Given by God:</strong> ${label.label_given_by_god === 'Y' ? 'Yes' : 'No'}<br>
@@ -215,10 +248,9 @@ function showPersonDetails(person) {
 
   // Verses mentioned (collapsible) with Tanakh/Apostolic distinction
   if (person.verses && person.verses.length > 0) {
-    // Sort verses by person_verse_sequence
     const sortedVerses = person.verses.sort((a, b) => parseInt(a.person_verse_sequence) - parseInt(b.person_verse_sequence));
-    const tanakhVerses = sortedVerses.filter(v => v.reference_id.startsWith('GEN') || v.reference_id.startsWith('EXO') /* Add more Tanakh books */);
-    const apostolicVerses = sortedVerses.filter(v => v.reference_id.startsWith('MAT') || v.reference_id.startsWith('MAR') || v.reference_id.startsWith('1CO') /* Add more Apostolic books */);
+    const tanakhVerses = sortedVerses.filter(v => v.reference_id.startsWith('GEN') || v.reference_id.startsWith('EXO') || v.reference_id.startsWith('LEV') || v.reference_id.startsWith('NUM') || v.reference_id.startsWith('DEU'));
+    const apostolicVerses = sortedVerses.filter(v => v.reference_id.startsWith('MAT') || v.reference_id.startsWith('MAR') || v.reference_id.startsWith('LUK') || v.reference_id.startsWith('JHN') || v.reference_id.startsWith('ACT'));
 
     profileHTML += `
       <h3><button class="collapsible">Verses Mentioned (${sortedVerses.length})</button></h3>
