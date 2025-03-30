@@ -3,6 +3,9 @@ const PERSON_FILE = './BibleData-Person.json';
 const LABEL_FILE = './BibleData-PersonLabel.json';
 const RELATIONSHIP_FILE = './BibleData-PersonRelationship.json';
 const PERSONVERSE_FILE = './BibleData-PersonVerse.json';
+const PERSONVERSE_TANAKH_FILE = './BibleData-PersonVerse-Tanakh.json';
+const PERSONVERSE_APOSTOLIC_FILE = './BibleData-PersonVerse-Apostolic.json';
+const BIBLEDATA_PERSON_FILE = './BibleData-PersonVerse.json'; // Assuming this is the same as PERSONVERSE_FILE or a subset
 
 // Data storage
 let peopleData = [];
@@ -15,25 +18,41 @@ const peopleCache = new Map();
 initApp();
 
 async function initApp() {
-  await Promise.all([
-    loadJSONData(PERSON_FILE, data => peopleData = data),
-    loadJSONData(LABEL_FILE, data => labelData = data),
-    loadJSONData(RELATIONSHIP_FILE, data => relationshipData = data),
-    loadJSONData(PERSONVERSE_FILE, data => personVerseData = data)
+  // Load all JSON files
+  const [personData, labelDataResult, relationshipDataResult, personVerseDataResult, personVerseTanakhData, personVerseApostolicData, bibleDataPersonResult] = await Promise.all([
+    loadJSONData(PERSON_FILE),
+    loadJSONData(LABEL_FILE),
+    loadJSONData(RELATIONSHIP_FILE),
+    loadJSONData(PERSONVERSE_FILE),
+    loadJSONData(PERSONVERSE_TANAKH_FILE),
+    loadJSONData(PERSONVERSE_APOSTOLIC_FILE),
+    loadJSONData(BIBLEDATA_PERSON_FILE)
   ]);
+
+  peopleData = personData;
+  labelData = labelDataResult;
+  relationshipData = relationshipDataResult;
+
+  // Combine all person-verse data and filter out "NA" entries
+  personVerseData = [
+    ...personVerseDataResult,
+    ...personVerseTanakhData,
+    ...personVerseApostolicData,
+    ...bibleDataPersonResult
+  ].filter(entry => entry.person_id !== "NA");
+
   setupSearch();
 }
 
 // Load JSON data using Fetch API
-async function loadJSONData(file, callback) {
+async function loadJSONData(file) {
   try {
     const response = await fetch(file);
     if (!response.ok) throw new Error(`Failed to fetch ${file}: ${response.statusText}`);
-    const data = await response.json();
-    callback(data);
+    return await response.json();
   } catch (err) {
     console.error(err);
-    callback([]);
+    return [];
   }
 }
 
@@ -81,9 +100,13 @@ async function fetchPersonDetails(person) {
     return;
   }
 
-  const personLabels = labelData.filter(label => label.person_id === person.person_id);
-  const personRelationships = relationshipData.filter(rel => rel.person_id_1 === person.person_id || rel.person_id_2 === person.person_id);
-  const personVerses = personVerseData.filter(pv => pv.person_id === person.person_id);
+  // Normalize person_id for case-insensitive matching
+  const personIdLower = person.person_id.toLowerCase();
+  const personLabels = labelData.filter(label => label.person_id.toLowerCase() === personIdLower);
+  const personRelationships = relationshipData.filter(rel => 
+    rel.person_id_1.toLowerCase() === personIdLower || rel.person_id_2.toLowerCase() === personIdLower
+  );
+  const personVerses = personVerseData.filter(pv => pv.person_id.toLowerCase() === personIdLower);
 
   const combinedPerson = {
     person_name: person.person_name,
@@ -112,7 +135,7 @@ async function fetchPersonDetails(person) {
 // Find children
 function findChildren(name) {
   return peopleData
-    .filter(p => p.father === name || p.mother === name)
+    .filter(p => (p.father || '').toLowerCase() === name.toLowerCase() || (p.mother || '').toLowerCase() === name.toLowerCase())
     .map(p => p.person_name);
 }
 
@@ -167,14 +190,14 @@ function showPersonDetails(person) {
       <div class="collapsible-content"><ul>
     `;
     person.relationships.forEach(rel => {
-      const otherPersonId = rel.person_id_1 === person.person_id ? rel.person_id_2 : rel.person_id_1;
-      const otherPerson = peopleData.find(p => p.person_id === otherPersonId);
+      const otherPersonId = rel.person_id_1.toLowerCase() === person.person_id.toLowerCase() ? rel.person_id_2 : rel.person_id_1;
+      const otherPerson = peopleData.find(p => p.person_id.toLowerCase() === otherPersonId.toLowerCase());
       const otherPersonName = otherPerson ? otherPerson.person_name : otherPersonId;
-      const role = rel.person_id_1 === person.person_id ? rel.relationship_type : `is ${rel.relationship_type} of`;
+      const role = rel.person_id_1.toLowerCase() === person.person_id.toLowerCase() ? rel.relationship_type : `is ${rel.relationship_type} of`;
       profileHTML += `
         <li>
           <strong>${role}</strong> ${otherPersonName}<br>
-          <strong>Reference:</strong> ${rel.relationship_reference_id || 'Not listed'}<br>
+          <strong>Reference:</strong> ${rel.reference_id || 'Not listed'}<br>
           ${rel.relationship_notes ? `<strong>Notes:</strong> ${rel.relationship_notes}` : ''}
         </li>
       `;
@@ -184,21 +207,50 @@ function showPersonDetails(person) {
     profileHTML += `<p>No additional relationships found.</p>`;
   }
 
-  // Verses mentioned (collapsible)
+  // Verses mentioned (collapsible) with Tanakh/Apostolic distinction
   if (person.verses && person.verses.length > 0) {
+    // Separate Tanakh and Apostolic verses
+    const tanakhVerses = person.verses.filter(v => v.reference_id.startsWith('GEN') || v.reference_id.startsWith('EXO') /* Add more Tanakh books */);
+    const apostolicVerses = person.verses.filter(v => v.reference_id.startsWith('MAT') || v.reference_id.startsWith('MAR') /* Add more Apostolic books */);
+
     profileHTML += `
       <h3><button class="collapsible">Verses Mentioned (${person.verses.length})</button></h3>
-      <div class="collapsible-content"><ul>
+      <div class="collapsible-content">
     `;
-    person.verses.forEach(verse => {
+
+    if (tanakhVerses.length > 0) {
       profileHTML += `
-        <li>
-          ${verse.verse_id}<br>
-          ${verse.person_verse_notes ? `<strong>Notes:</strong> ${verse.person_verse_notes}` : ''}
-        </li>
+        <h4>Tanakh (${tanakhVerses.length})</h4>
+        <ul>
       `;
-    });
-    profileHTML += `</ul></div>`;
+      tanakhVerses.forEach(verse => {
+        profileHTML += `
+          <li>
+            ${verse.reference_id} (Label: ${verse.person_label})<br>
+            ${verse.person_verse_notes ? `<strong>Notes:</strong> ${verse.person_verse_notes}` : ''}
+          </li>
+        `;
+      });
+      profileHTML += `</ul>`;
+    }
+
+    if (apostolicVerses.length > 0) {
+      profileHTML += `
+        <h4>Apostolic Writings (${apostolicVerses.length})</h4>
+        <ul>
+      `;
+      apostolicVerses.forEach(verse => {
+        profileHTML += `
+          <li>
+            ${verse.reference_id} (Label: ${verse.person_label})<br>
+            ${verse.person_verse_notes ? `<strong>Notes:</strong> ${verse.person_verse_notes}` : ''}
+          </li>
+        `;
+      });
+      profileHTML += `</ul>`;
+    }
+
+    profileHTML += `</div>`;
   } else {
     profileHTML += `<p>No additional verses found.</p>`;
   }
