@@ -65,6 +65,11 @@
             background: rgba(0,0,0,0.5);
             z-index: 999;
         }
+        #error-message {
+            color: red;
+            font-size: 18px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -77,15 +82,6 @@
     </div>
 
     <script>
-        // Precomputed fallback data in case all APIs fail
-        const fallbackData = [
-            {"word": "lord", "count": 7759},
-            {"word": "god", "count": 3977},
-            {"word": "man", "count": 2764},
-            {"word": "israel", "count": 2575},
-            {"word": "people", "count": 2143}
-        ];
-
         // API fetch functions with redundancy
         const apiSources = [
             {
@@ -93,7 +89,7 @@
                 async fetchText() {
                     const books = await (await fetch('https://bible-go-api.rkeplin.com/v1/books')).json();
                     let text = "";
-                    for (const book of books.slice(0, 2)) { // Limit for demo
+                    for (const book of books.slice(0, 2)) { // Limit for demo; remove slice for full Bible
                         const chapters = await (await fetch(`https://bible-go-api.rkeplin.com/v1/books/${book.id}/chapters?translation=KJV`)).json();
                         for (const chapter of chapters) {
                             const verses = await (await fetch(`https://bible-go-api.rkeplin.com/v1/books/${book.id}/chapters/${chapter.id}?translation=KJV`)).json();
@@ -106,7 +102,7 @@
             {
                 name: "Bible SuperSearch API",
                 async fetchText() {
-                    const books = ["Gen", "Exod"]; // Limit for demo
+                    const books = ["Gen", "Exod"]; // Limit for demo; expand for full Bible
                     let text = "";
                     for (const book of books) {
                         const data = await (await fetch(`https://api.biblesupersearch.com/api?bible=kjv&reference=${book}`)).json();
@@ -124,10 +120,12 @@
             {
                 name: "Bible API",
                 async fetchText() {
-                    const response = await fetch('https://bibleapi.co/api/verses/kjv'); // Requires full Bible fetch, simplified for demo
-                    const data = await response.json();
+                    const books = ["GEN", "EXO"]; // Limit for demo; expand for full Bible
                     let text = "";
-                    data.forEach(verse => text += verse.text + " ");
+                    for (const book of books) {
+                        const data = await (await fetch(`https://bibleapi.co/api/verses/kjv/${book}`)).json();
+                        data.forEach(verse => text += verse.text + " ");
+                    }
                     return text;
                 }
             }
@@ -152,7 +150,10 @@
             // Try precomputed JSON first
             try {
                 const response = await fetch('word-frequencies.json');
-                if (response.ok) return await response.json();
+                if (response.ok) {
+                    console.log("Using precomputed JSON data");
+                    return await response.json();
+                }
             } catch (e) {
                 console.log("Precomputed JSON not found, trying APIs...");
             }
@@ -168,29 +169,33 @@
                 }
             }
 
-            // Fallback to static data if all APIs fail
-            console.log("All APIs failed, using fallback data...");
-            return fallbackData;
+            // If all fail, throw an error
+            throw new Error("All API sources failed and no precomputed data available.");
         }
 
         // Display words
         async function displayWords() {
-            const wordData = await fetchWordData();
-            window.wordData = wordData; // Store globally for popup access
             const wordCloud = document.getElementById('word-cloud');
-            const maxCount = Math.max(...wordData.map(w => w.count));
-            const totalWords = wordData.reduce((sum, item) => sum + item.count, 0); // Adjust for full Bible later
+            try {
+                const wordData = await fetchWordData();
+                window.wordData = wordData; // Store globally for popup access
+                const maxCount = Math.max(...wordData.map(w => w.count));
+                const totalWords = wordData.reduce((sum, item) => sum + item.count, 0); // Sample total; use 788258 for full KJV
 
-            wordCloud.innerHTML = ""; // Clear previous content
-            wordData.forEach(item => {
-                const span = document.createElement('span');
-                span.className = 'word';
-                span.textContent = item.word;
-                const fontSize = (item.count / maxCount) * 60 + 10;
-                span.style.fontSize = `${fontSize}px`;
-                span.addEventListener('click', () => showPopup(item, totalWords));
-                wordCloud.appendChild(span);
-            });
+                wordCloud.innerHTML = ""; // Clear previous content
+                wordData.forEach(item => {
+                    const span = document.createElement('span');
+                    span.className = 'word';
+                    span.textContent = item.word;
+                    const fontSize = (item.count / maxCount) * 60 + 10;
+                    span.style.fontSize = `${fontSize}px`;
+                    span.addEventListener('click', () => showPopup(item, totalWords));
+                    wordCloud.appendChild(span);
+                });
+            } catch (e) {
+                console.error(e);
+                wordCloud.innerHTML = '<div id="error-message">Failed to load word data. Please try again later or provide a precomputed word-frequencies.json file.</div>';
+            }
         }
 
         // Show popup with stats
