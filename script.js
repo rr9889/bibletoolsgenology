@@ -1,5 +1,5 @@
-// Local CSV file (relative path for GitHub)
-const CSV_FILE = './BibleData-Person.csv';
+// Local CSV file
+const CSV_FILE = 'BibleData-Person.csv';
 
 // Data storage
 let peopleData = [];
@@ -104,67 +104,66 @@ function findChildren(name) {
 // Display person details in the profile section
 function showPersonDetails(person) {
   const profileDiv = document.getElementById('profile');
-  
-  // Basic info from CSV
-  let profileHTML = `
-    <h2>${person.person_name}</h2>
-    <p><strong>ID:</strong> ${person.person_id}</p>
-    <p><strong>Surname:</strong> ${person.surname}</p>
-    <p><strong>Unique Attribute:</strong> ${person.unique_attribute}</p>
+  profileDiv.innerHTML = `
+    <h2>${person.name}</h2>
     <p><strong>Sex:</strong> ${person.sex}</p>
-    <p><strong>Tribe:</strong> ${person.tribe}</p>
-    <p><strong>Notes:</strong> ${person.person_notes}</p>
-    <p><strong>Instance:</strong> ${person.person_instance}</p>
-    <p><strong>Sequence:</strong> ${person.person_sequence}</p>
     <p><strong>Father:</strong> ${person.father}</p>
     <p><strong>Mother:</strong> ${person.mother}</p>
     <p><strong>Children:</strong> ${person.children.length ? person.children.join(', ') : 'None listed'}</p>
     <p><strong>First Verse:</strong> ${person.firstVerse}</p>
     <p><strong>Last Verse:</strong> ${person.lastVerse}</p>
   `;
-
-  // Add alternative names/titles from JSON with a collapsible section
-  if (person.labels && person.labels.length > 0) {
-    profileHTML += `
-      <h3>
-        <button class="collapsible">Alternative Names/Titles (${person.labels.length})</button>
-      </h3>
-      <div class="collapsible-content">
-        <ul>
-    `;
-    person.labels.forEach(label => {
-      profileHTML += `
-        <li>
-          <strong>${label.english_label}</strong> (${label.label_type})<br>
-          <strong>Hebrew:</strong> ${label.hebrew_label} (${label.hebrew_label_transliterated}) - ${label.hebrew_label_meaning || 'No meaning provided'} [Strong's ${label.hebrew_strongs_number || 'N/A'}]<br>
-          <strong>Greek:</strong> ${label.greek_label} (${label.greek_label_transliterated}) - ${label.greek_label_meaning || 'No meaning provided'} [Strong's ${label.greek_strongs_number || 'N/A'}]<br>
-          <strong>Reference:</strong> ${label.label_reference_id}<br>
-          <strong>Given by God:</strong> ${label.label_given_by_god === 'Y' ? 'Yes' : 'No'}<br>
-          ${label.label_notes ? `<strong>Notes:</strong> ${label.label_notes}` : ''}
-        </li>
-      `;
-    });
-    profileHTML += `</ul></div>`;
-  } else {
-    profileHTML += `<p>No alternative names or titles found.</p>`;
-  }
-
-  profileDiv.innerHTML = profileHTML;
   profileDiv.classList.add('active');
 
-  // Add event listeners for collapsible sections
-  const collapsibles = document.getElementsByClassName('collapsible');
-  for (let i = 0; i < collapsibles.length; i++) {
-    collapsibles[i].addEventListener('click', function() {
-      this.classList.toggle('active');
-      const content = this.nextElementSibling;
-      if (content.style.display === 'block') {
-        content.style.display = 'none';
-      } else {
-        content.style.display = 'block';
-      }
-    });
-  }
-
   drawFamilyTree(person);
+}
+
+// Draw a family tree using D3.js
+function drawFamilyTree(person) {
+  const treeDiv = document.getElementById('family-tree');
+  treeDiv.innerHTML = '';
+
+  const treeData = { name: person.name, children: [] };
+  if (person.father && person.father !== 'Not listed') treeData.children.push({ name: `${person.father} (Father)` });
+  if (person.mother && person.mother !== 'Not listed') treeData.children.push({ name: `${person.mother} (Mother)` });
+  person.children.forEach(child => treeData.children.push({ name: `${child} (Child)` }));
+
+  const width = 800, height = 400;
+  const svg = d3.select('#family-tree')
+                .append('svg')
+                .attr('width', width)
+                .attr('height', height);
+  const g = svg.append('g').attr('transform', 'translate(20, 20)');
+
+  const treeLayout = d3.tree().size([width - 40, height - 40]);
+  const root = d3.hierarchy(treeData);
+  treeLayout(root);
+
+  // Draw links
+  g.selectAll('.link')
+    .data(root.links())
+    .enter()
+    .append('path')
+    .attr('d', d3.linkVertical().x(d => d.x).y(d => d.y))
+    .attr('fill', 'none')
+    .attr('stroke', '#8b5a2b')
+    .attr('stroke-width', 2);
+
+  // Draw nodes
+  const node = g.selectAll('.node')
+    .data(root.descendants())
+    .enter()
+    .append('g')
+    .attr('transform', d => `translate(${d.x},${d.y})`);
+    
+  node.append('circle')
+    .attr('r', 6)
+    .attr('fill', '#4a2c0d');
+    
+  node.append('text')
+    .attr('dy', '.35em')
+    .attr('x', d => d.children ? -10 : 10)
+    .attr('text-anchor', d => d.children ? 'end' : 'start')
+    .text(d => d.data.name)
+    .attr('fill', '#4a2c0d');
 }
