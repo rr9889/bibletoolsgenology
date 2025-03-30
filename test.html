@@ -3,27 +3,26 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Interactive Bible Genealogy Explorer</title>
+  <title>Bible Genealogy Explorer</title>
   <link rel="stylesheet" href="./test.css">
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <script src="https://unpkg.com/fuse.js@6.4.6/dist/fuse.min.js"></script>
 </head>
 <body>
   <header>
-    <h1>Interactive Bible Genealogy Explorer</h1>
+    <h1>Bible Genealogy Explorer</h1>
   </header>
   <main>
-    <!-- Search and Filters -->
+    <!-- Controls Section -->
     <section class="controls">
-      <div class="search-container">
-        <input type="text" id="search" placeholder="Search for a biblical figure...">
+      <div class="search-bar">
+        <input type="text" id="search-input" placeholder="Search for a character (e.g., Moses)">
         <button id="search-btn">Search</button>
       </div>
       <div class="filters">
         <label for="tribe-filter">Tribe:</label>
         <select id="tribe-filter">
           <option value="">All Tribes</option>
-          <!-- Populated dynamically -->
         </select>
         <label for="sex-filter">Sex:</label>
         <select id="sex-filter">
@@ -41,11 +40,11 @@
     </section>
 
     <!-- Search Results -->
-    <section id="results" class="results"></section>
+    <section id="search-results" class="results"></section>
 
     <!-- Character Profile -->
-    <section id="profile" class="profile">
-      <h2 id="profile-name">Select a character to view details</h2>
+    <section id="character-profile" class="profile">
+      <h2 id="character-name">Select a character to view details</h2>
       <div id="basic-info"></div>
       <div id="labels-section"></div>
       <div id="relationships-section"></div>
@@ -58,12 +57,12 @@
       <div id="family-tree"></div>
     </section>
 
-    <!-- Verse Explorer Modal -->
+    <!-- Verse Modal -->
     <div id="verse-modal" class="modal">
       <div class="modal-content">
         <span class="close">&times;</span>
-        <h3 id="verse-modal-title"></h3>
-        <p id="verse-modal-text">Loading verse text...</p>
+        <h3 id="verse-title"></h3>
+        <p id="verse-text">Loading...</p>
       </div>
     </div>
   </main>
