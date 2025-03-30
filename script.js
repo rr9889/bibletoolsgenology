@@ -1,40 +1,64 @@
-// Local CSV file
-const CSV_FILE = 'BibleData-Person.csv';
+// Local CSV and JSON files (relative paths for GitHub)
+const CSV_PERSON_FILE = './BibleData-Person.csv';
+const JSON_LABEL_FILE = './BibleData-PersonLabel.json';
+const CSV_RELATIONSHIP_FILE = 'https://raw.githubusercontent.com/BradyStephenson/bible-data/main/BibleData-PersonRelationship.csv';
+const CSV_PERSONVERSE_FILE = 'https://raw.githubusercontent.com/BradyStephenson/bible-data/main/BibleData-PersonVerse.csv';
 
 // Data storage
-let peopleData = [];
+let peopleData = []; // From BibleData-Person.csv
+let labelData = [];  // From BibleData-PersonLabel.json
+let relationshipData = []; // From BibleData-PersonRelationship.csv
+let personVerseData = []; // From BibleData-PersonVerse.csv
 const peopleCache = new Map();
 
 // Initialize the app
 initApp();
 
 async function initApp() {
-  await loadCSVData();
+  await Promise.all([
+    loadCSVData(CSV_PERSON_FILE, data => peopleData = data),
+    loadJSONData(),
+    loadCSVData(CSV_RELATIONSHIP_FILE, data => relationshipData = data),
+    loadCSVData(CSV_PERSONVERSE_FILE, data => personVerseData = data)
+  ]);
   setupSearch();
 }
 
 // Load CSV data using PapaParse
-async function loadCSVData() {
+async function loadCSVData(file, callback) {
   return new Promise((resolve) => {
-    Papa.parse(CSV_FILE, {
+    Papa.parse(file, {
       download: true,
       header: true,
       complete: (results) => {
-        // Filter out rows without a name
-        peopleData = results.data.filter(row => row.name);
+        const data = results.data.filter(row => Object.keys(row).length > 0);
+        callback(data);
         resolve();
       },
       error: (err) => {
-        console.error(`Failed to load ${CSV_FILE}: ${err}`);
-        resolve(); // Continue even if CSV fails
+        console.error(`Failed to load ${file}: ${err}`);
+        callback([]);
+        resolve();
       }
     });
   });
 }
 
+// Load JSON data using Fetch API
+async function loadJSONData() {
+  try {
+    const response = await fetch(JSON_LABEL_FILE);
+    if (!response.ok) throw new Error(`Failed to fetch ${JSON_LABEL_FILE}: ${response.statusText}`);
+    labelData = await response.json();
+  } catch (err) {
+    console.error(err);
+    labelData = [];
+  }
+}
+
 // Set up search functionality using Fuse.js
 function setupSearch() {
-  const fuse = new Fuse(peopleData, { keys: ['name'], threshold: 0.3 });
+  const fuse = new Fuse(peopleData, { keys: ['person_name'], threshold: 0.3 });
   const searchInput = document.getElementById('search');
   const searchBtn = document.getElementById('search-btn');
   const resultsDiv = document.getElementById('results');
@@ -47,7 +71,6 @@ function setupSearch() {
       return;
     }
 
-    // Search using Fuse.js over the CSV data
     const csvResults = fuse.search(query);
     const combinedResults = csvResults.map(r => r.item);
 
@@ -59,7 +82,7 @@ function setupSearch() {
     combinedResults.forEach(person => {
       const div = document.createElement('div');
       div.className = 'result-item';
-      div.innerHTML = `<strong>${person.name}</strong> (${person.sex || 'Unknown'})`;
+      div.innerHTML = `<strong>${person.person_name}</strong> (${person.sex || 'Unknown'})`;
       div.addEventListener('click', () => fetchPersonDetails(person));
       resultsDiv.appendChild(div);
     });
@@ -70,27 +93,39 @@ function setupSearch() {
   });
 }
 
-// Fetch person details using CSV data only
+// Fetch person details using CSV and JSON data
 async function fetchPersonDetails(person) {
-  if (peopleCache.has(person.name)) {
-    showPersonDetails(peopleCache.get(person.name));
+  if (peopleCache.has(person.person_name)) {
+    showPersonDetails(peopleCache.get(person.person_name));
     return;
   }
 
-  // Find the corresponding record from the CSV data
-  const csvPerson = peopleData.find(p => p.name === person.name) || {};
+  const csvPerson = peopleData.find(p => p.person_name === person.person_name) || {};
+  const personLabels = labelData.filter(label => label.person_id === csvPerson.person_id);
+  const personRelationships = relationshipData.filter(rel => rel.person_id_1 === csvPerson.person_id || rel.person_id_2 === csvPerson.person_id);
+  const personVerses = personVerseData.filter(pv => pv.person_id === csvPerson.person_id);
 
   const combinedPerson = {
-    name: person.name,
+    person_name: person.person_name,
+    person_id: csvPerson.person_id || 'Not listed',
+    surname: csvPerson.surname || 'Not listed',
+    unique_attribute: csvPerson.unique_attribute || 'Not listed',
     sex: csvPerson.sex || 'Unknown',
+    tribe: csvPerson.tribe || 'Not listed',
+    person_notes: csvPerson.person_notes || 'Not listed',
+    person_instance: csvPerson.person_instance || 'Not listed',
+    person_sequence: csvPerson.person_sequence || 'Not listed',
     father: csvPerson.father || 'Not listed',
     mother: csvPerson.mother || 'Not listed',
     firstVerse: csvPerson.firstVerse || 'Not listed',
     lastVerse: csvPerson.lastVerse || 'Not listed',
-    children: findChildren(person.name)
+    children: findChildren(person.person_name),
+    labels: personLabels,
+    relationships: personRelationships,
+    verses: personVerses
   };
 
-  peopleCache.set(person.name, combinedPerson);
+  peopleCache.set(person.person_name, combinedPerson);
   showPersonDetails(combinedPerson);
 }
 
@@ -98,22 +133,112 @@ async function fetchPersonDetails(person) {
 function findChildren(name) {
   return peopleData
     .filter(p => p.father === name || p.mother === name)
-    .map(p => p.name);
+    .map(p => p.person_name);
 }
 
 // Display person details in the profile section
 function showPersonDetails(person) {
   const profileDiv = document.getElementById('profile');
-  profileDiv.innerHTML = `
-    <h2>${person.name}</h2>
+  
+  let profileHTML = `
+    <h2>${person.person_name}</h2>
+    <p><strong>ID:</strong> ${person.person_id}</p>
+    <p><strong>Surname:</strong> ${person.surname}</p>
+    <p><strong>Unique Attribute:</strong> ${person.unique_attribute}</p>
     <p><strong>Sex:</strong> ${person.sex}</p>
+    <p><strong>Tribe:</strong> ${person.tribe}</p>
+    <p><strong>Notes:</strong> ${person.person_notes}</p>
+    <p><strong>Instance:</strong> ${person.person_instance}</p>
+    <p><strong>Sequence:</strong> ${person.person_sequence}</p>
     <p><strong>Father:</strong> ${person.father}</p>
     <p><strong>Mother:</strong> ${person.mother}</p>
     <p><strong>Children:</strong> ${person.children.length ? person.children.join(', ') : 'None listed'}</p>
     <p><strong>First Verse:</strong> ${person.firstVerse}</p>
     <p><strong>Last Verse:</strong> ${person.lastVerse}</p>
   `;
+
+  // Add alternative names/titles from JSON (collapsible)
+  if (person.labels && person.labels.length > 0) {
+    profileHTML += `
+      <h3><button class="collapsible">Alternative Names/Titles (${person.labels.length})</button></h3>
+      <div class="collapsible-content"><ul>
+    `;
+    person.labels.forEach(label => {
+      profileHTML += `
+        <li>
+          <strong>${label.english_label}</strong> (${label.label_type})<br>
+          <strong>Hebrew:</strong> ${label.hebrew_label} (${label.hebrew_label_transliterated}) - ${label.hebrew_label_meaning || 'No meaning provided'} [Strong's ${label.hebrew_strongs_number || 'N/A'}]<br>
+          <strong>Greek:</strong> ${label.greek_label} (${label.greek_label_transliterated}) - ${label.greek_label_meaning || 'No meaning provided'} [Strong's ${label.greek_strongs_number || 'N/A'}]<br>
+          <strong>Reference:</strong> ${label.label_reference_id}<br>
+          <strong>Given by God:</strong> ${label.label_given_by_god === 'Y' ? 'Yes' : 'No'}<br>
+          ${label.label_notes ? `<strong>Notes:</strong> ${label.label_notes}` : ''}
+        </li>
+      `;
+    });
+    profileHTML += `</ul></div>`;
+  } else {
+    profileHTML += `<p>No alternative names or titles found.</p>`;
+  }
+
+  // Add relationships from BibleData-PersonRelationship.csv (collapsible)
+  if (person.relationships && person.relationships.length > 0) {
+    profileHTML += `
+      <h3><button class="collapsible">Relationships (${person.relationships.length})</button></h3>
+      <div class="collapsible-content"><ul>
+    `;
+    person.relationships.forEach(rel => {
+      const otherPersonId = rel.person_id_1 === person.person_id ? rel.person_id_2 : rel.person_id_1;
+      const otherPerson = peopleData.find(p => p.person_id === otherPersonId);
+      const otherPersonName = otherPerson ? otherPerson.person_name : otherPersonId;
+      const role = rel.person_id_1 === person.person_id ? rel.relationship_type : `is ${rel.relationship_type} of`;
+      profileHTML += `
+        <li>
+          <strong>${role}</strong> ${otherPersonName}<br>
+          <strong>Reference:</strong> ${rel.relationship_reference_id || 'Not listed'}<br>
+          ${rel.relationship_notes ? `<strong>Notes:</strong> ${rel.relationship_notes}` : ''}
+        </li>
+      `;
+    });
+    profileHTML += `</ul></div>`;
+  } else {
+    profileHTML += `<p>No additional relationships found.</p>`;
+  }
+
+  // Add verses mentioned from BibleData-PersonVerse.csv (collapsible)
+  if (person.verses && person.verses.length > 0) {
+    profileHTML += `
+      <h3><button class="collapsible">Verses Mentioned (${person.verses.length})</button></h3>
+      <div class="collapsible-content"><ul>
+    `;
+    person.verses.forEach(verse => {
+      profileHTML += `
+        <li>
+          ${verse.verse_id}<br>
+          ${verse.person_verse_notes ? `<strong>Notes:</strong> ${verse.person_verse_notes}` : ''}
+        </li>
+      `;
+    });
+    profileHTML += `</ul></div>`;
+  } else {
+    profileHTML += `<p>No additional verses found.</p>`;
+  }
+
+  profileDiv.innerHTML = profileHTML;
   profileDiv.classList.add('active');
+
+  // Add event listeners for collapsible sections
+  const collapsibles = document.getElementsByClassName('collapsible');
+  for (let i = 0; i < collapsibles.length; i++) {
+    collapsibles[i].addEventListener('click', function() {
+      this.classList.toggle('active');
+      const content = this.nextElementSibling;
+      if (content.style.display === 'block') {
+        content.style.display = 'none';
+      } else {
+        content.style.display = 'block';
+      }
+    });
+  }
 
   drawFamilyTree(person);
 }
@@ -123,7 +248,7 @@ function drawFamilyTree(person) {
   const treeDiv = document.getElementById('family-tree');
   treeDiv.innerHTML = '';
 
-  const treeData = { name: person.name, children: [] };
+  const treeData = { name: person.person_name, children: [] };
   if (person.father && person.father !== 'Not listed') treeData.children.push({ name: `${person.father} (Father)` });
   if (person.mother && person.mother !== 'Not listed') treeData.children.push({ name: `${person.mother} (Mother)` });
   person.children.forEach(child => treeData.children.push({ name: `${child} (Child)` }));
@@ -139,7 +264,6 @@ function drawFamilyTree(person) {
   const root = d3.hierarchy(treeData);
   treeLayout(root);
 
-  // Draw links
   g.selectAll('.link')
     .data(root.links())
     .enter()
@@ -149,7 +273,6 @@ function drawFamilyTree(person) {
     .attr('stroke', '#8b5a2b')
     .attr('stroke-width', 2);
 
-  // Draw nodes
   const node = g.selectAll('.node')
     .data(root.descendants())
     .enter()
