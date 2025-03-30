@@ -1,17 +1,15 @@
-// Local CSV and JSON files (relative paths for GitHub)
+// Local CSV file (relative path for GitHub)
 const CSV_FILE = './BibleData-Person.csv';
-const JSON_FILE = './BibleData-PersonLabel.json';
 
 // Data storage
-let peopleData = []; // From CSV
-let labelData = [];  // From JSON
+let peopleData = [];
 const peopleCache = new Map();
 
 // Initialize the app
 initApp();
 
 async function initApp() {
-  await Promise.all([loadCSVData(), loadJSONData()]);
+  await loadCSVData();
   setupSearch();
 }
 
@@ -22,8 +20,8 @@ async function loadCSVData() {
       download: true,
       header: true,
       complete: (results) => {
-        // Filter out rows without a person_name
-        peopleData = results.data.filter(row => row.person_name);
+        // Filter out rows without a name
+        peopleData = results.data.filter(row => row.name);
         resolve();
       },
       error: (err) => {
@@ -34,21 +32,9 @@ async function loadCSVData() {
   });
 }
 
-// Load JSON data using Fetch API
-async function loadJSONData() {
-  try {
-    const response = await fetch(JSON_FILE);
-    if (!response.ok) throw new Error(`Failed to fetch ${JSON_FILE}: ${response.statusText}`);
-    labelData = await response.json();
-  } catch (err) {
-    console.error(err);
-    labelData = []; // Fallback to empty array if JSON fails
-  }
-}
-
 // Set up search functionality using Fuse.js
 function setupSearch() {
-  const fuse = new Fuse(peopleData, { keys: ['person_name'], threshold: 0.3 });
+  const fuse = new Fuse(peopleData, { keys: ['name'], threshold: 0.3 });
   const searchInput = document.getElementById('search');
   const searchBtn = document.getElementById('search-btn');
   const resultsDiv = document.getElementById('results');
@@ -73,7 +59,7 @@ function setupSearch() {
     combinedResults.forEach(person => {
       const div = document.createElement('div');
       div.className = 'result-item';
-      div.innerHTML = `<strong>${person.person_name}</strong> (${person.sex || 'Unknown'})`;
+      div.innerHTML = `<strong>${person.name}</strong> (${person.sex || 'Unknown'})`;
       div.addEventListener('click', () => fetchPersonDetails(person));
       resultsDiv.appendChild(div);
     });
@@ -84,38 +70,27 @@ function setupSearch() {
   });
 }
 
-// Fetch person details using CSV and JSON data
+// Fetch person details using CSV data only
 async function fetchPersonDetails(person) {
-  if (peopleCache.has(person.person_name)) {
-    showPersonDetails(peopleCache.get(person.person_name));
+  if (peopleCache.has(person.name)) {
+    showPersonDetails(peopleCache.get(person.name));
     return;
   }
 
   // Find the corresponding record from the CSV data
-  const csvPerson = peopleData.find(p => p.person_name === person.person_name) || {};
-
-  // Find all labels from the JSON data using person_id
-  const personLabels = labelData.filter(label => label.person_id === csvPerson.person_id);
+  const csvPerson = peopleData.find(p => p.name === person.name) || {};
 
   const combinedPerson = {
-    person_name: person.person_name,
-    person_id: csvPerson.person_id || 'Not listed',
-    surname: csvPerson.surname || 'Not listed',
-    unique_attribute: csvPerson.unique_attribute || 'Not listed',
+    name: person.name,
     sex: csvPerson.sex || 'Unknown',
-    tribe: csvPerson.tribe || 'Not listed',
-    person_notes: csvPerson.person_notes || 'Not listed',
-    person_instance: csvPerson.person_instance || 'Not listed',
-    person_sequence: csvPerson.person_sequence || 'Not listed',
     father: csvPerson.father || 'Not listed',
     mother: csvPerson.mother || 'Not listed',
     firstVerse: csvPerson.firstVerse || 'Not listed',
     lastVerse: csvPerson.lastVerse || 'Not listed',
-    children: findChildren(person.person_name),
-    labels: personLabels // Add the labels from JSON
+    children: findChildren(person.name)
   };
 
-  peopleCache.set(person.person_name, combinedPerson);
+  peopleCache.set(person.name, combinedPerson);
   showPersonDetails(combinedPerson);
 }
 
@@ -123,7 +98,7 @@ async function fetchPersonDetails(person) {
 function findChildren(name) {
   return peopleData
     .filter(p => p.father === name || p.mother === name)
-    .map(p => p.person_name);
+    .map(p => p.name);
 }
 
 // Display person details in the profile section
@@ -148,9 +123,15 @@ function showPersonDetails(person) {
     <p><strong>Last Verse:</strong> ${person.lastVerse}</p>
   `;
 
-  // Add alternative names/titles from JSON
+  // Add alternative names/titles from JSON with a collapsible section
   if (person.labels && person.labels.length > 0) {
-    profileHTML += `<h3>Alternative Names/Titles</h3><ul>`;
+    profileHTML += `
+      <h3>
+        <button class="collapsible">Alternative Names/Titles (${person.labels.length})</button>
+      </h3>
+      <div class="collapsible-content">
+        <ul>
+    `;
     person.labels.forEach(label => {
       profileHTML += `
         <li>
@@ -163,7 +144,7 @@ function showPersonDetails(person) {
         </li>
       `;
     });
-    profileHTML += `</ul>`;
+    profileHTML += `</ul></div>`;
   } else {
     profileHTML += `<p>No alternative names or titles found.</p>`;
   }
@@ -171,55 +152,19 @@ function showPersonDetails(person) {
   profileDiv.innerHTML = profileHTML;
   profileDiv.classList.add('active');
 
+  // Add event listeners for collapsible sections
+  const collapsibles = document.getElementsByClassName('collapsible');
+  for (let i = 0; i < collapsibles.length; i++) {
+    collapsibles[i].addEventListener('click', function() {
+      this.classList.toggle('active');
+      const content = this.nextElementSibling;
+      if (content.style.display === 'block') {
+        content.style.display = 'none';
+      } else {
+        content.style.display = 'block';
+      }
+    });
+  }
+
   drawFamilyTree(person);
-}
-
-// Draw a family tree using D3.js
-function drawFamilyTree(person) {
-  const treeDiv = document.getElementById('family-tree');
-  treeDiv.innerHTML = '';
-
-  const treeData = { name: person.person_name, children: [] };
-  if (person.father && person.father !== 'Not listed') treeData.children.push({ name: `${person.father} (Father)` });
-  if (person.mother && person.mother !== 'Not listed') treeData.children.push({ name: `${person.mother} (Mother)` });
-  person.children.forEach(child => treeData.children.push({ name: `${child} (Child)` }));
-
-  const width = 800, height = 400;
-  const svg = d3.select('#family-tree')
-                .append('svg')
-                .attr('width', width)
-                .attr('height', height);
-  const g = svg.append('g').attr('transform', 'translate(20, 20)');
-
-  const treeLayout = d3.tree().size([width - 40, height - 40]);
-  const root = d3.hierarchy(treeData);
-  treeLayout(root);
-
-  // Draw links
-  g.selectAll('.link')
-    .data(root.links())
-    .enter()
-    .append('path')
-    .attr('d', d3.linkVertical().x(d => d.x).y(d => d.y))
-    .attr('fill', 'none')
-    .attr('stroke', '#8b5a2b')
-    .attr('stroke-width', 2);
-
-  // Draw nodes
-  const node = g.selectAll('.node')
-    .data(root.descendants())
-    .enter()
-    .append('g')
-    .attr('transform', d => `translate(${d.x},${d.y})`);
-    
-  node.append('circle')
-    .attr('r', 6)
-    .attr('fill', '#4a2c0d');
-    
-  node.append('text')
-    .attr('dy', '.35em')
-    .attr('x', d => d.children ? -10 : 10)
-    .attr('text-anchor', d => d.children ? 'end' : 'start')
-    .text(d => d.data.name)
-    .attr('fill', '#4a2c0d');
 }
