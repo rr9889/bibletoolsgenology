@@ -1,14 +1,26 @@
-// Local CSV and JSON files (relative paths for GitHub)
+// File paths (relative, since all files are in the same directory)
 const CSV_PERSON_FILE = './BibleData-Person.csv';
 const JSON_LABEL_FILE = './BibleData-PersonLabel.json';
-const CSV_RELATIONSHIP_FILE = 'https://raw.githubusercontent.com/BradyStephenson/bible-data/main/BibleData-PersonRelationship.csv';
-const CSV_PERSONVERSE_FILE = 'https://raw.githubusercontent.com/BradyStephenson/bible-data/main/BibleData-PersonVerse.csv';
+const CSV_RELATIONSHIP_FILE = './BibleData-PersonRelationship.csv';
+const CSV_PERSONVERSE_FILE = './BibleData-PersonVerse.csv';
+const CSV_PERSONVERSE_APOSTOLIC_FILE = './BibleData-PersonVerseApostolic.csv';
+const CSV_PERSONVERSE_TANAKH_FILE = './BibleData-PersonVerseTanakh.csv';
+const CSV_EPOCH_FILE = './BibleData-Epoch.csv';
+const CSV_EVENT_FILE = './BibleData-Event.csv';
+const CSV_PLACEVERSE_FILE = './BibleData-PlaceVerse.csv';
+const CSV_HITCHCOCKS_FILE = './HitchcocksBibleNamesDictionary.csv';
 
 // Data storage
-let peopleData = []; // From BibleData-Person.csv
-let labelData = [];  // From BibleData-PersonLabel.json
-let relationshipData = []; // From BibleData-PersonRelationship.csv
-let personVerseData = []; // From BibleData-PersonVerse.csv
+let peopleData = [];
+let labelData = [];
+let relationshipData = [];
+let personVerseData = [];
+let personVerseApostolicData = [];
+let personVerseTanakhData = [];
+let epochData = [];
+let eventData = [];
+let placeVerseData = [];
+let hitchcocksData = [];
 const peopleCache = new Map();
 
 // Initialize the app
@@ -19,7 +31,13 @@ async function initApp() {
     loadCSVData(CSV_PERSON_FILE, data => peopleData = data),
     loadJSONData(),
     loadCSVData(CSV_RELATIONSHIP_FILE, data => relationshipData = data),
-    loadCSVData(CSV_PERSONVERSE_FILE, data => personVerseData = data)
+    loadCSVData(CSV_PERSONVERSE_FILE, data => personVerseData = data),
+    loadCSVData(CSV_PERSONVERSE_APOSTOLIC_FILE, data => personVerseApostolicData = data),
+    loadCSVData(CSV_PERSONVERSE_TANAKH_FILE, data => personVerseTanakhData = data),
+    loadCSVData(CSV_EPOCH_FILE, data => epochData = data),
+    loadCSVData(CSV_EVENT_FILE, data => eventData = data),
+    loadCSVData(CSV_PLACEVERSE_FILE, data => placeVerseData = data),
+    loadCSVData(CSV_HITCHCOCKS_FILE, data => hitchcocksData = data)
   ]);
   setupSearch();
 }
@@ -93,7 +111,7 @@ function setupSearch() {
   });
 }
 
-// Fetch person details using CSV and JSON data
+// Fetch person details using all data sources
 async function fetchPersonDetails(person) {
   if (peopleCache.has(person.person_name)) {
     showPersonDetails(peopleCache.get(person.person_name));
@@ -104,6 +122,35 @@ async function fetchPersonDetails(person) {
   const personLabels = labelData.filter(label => label.person_id === csvPerson.person_id);
   const personRelationships = relationshipData.filter(rel => rel.person_id_1 === csvPerson.person_id || rel.person_id_2 === csvPerson.person_id);
   const personVerses = personVerseData.filter(pv => pv.person_id === csvPerson.person_id);
+  const personVersesApostolic = personVerseApostolicData.filter(pv => pv.person_id === csvPerson.person_id);
+  const personVersesTanakh = personVerseTanakhData.filter(pv => pv.person_id === csvPerson.person_id);
+
+  // Find the epoch (based on firstVerse)
+  let personEpoch = 'Not listed';
+  if (csvPerson.firstVerse) {
+    const verseParts = csvPerson.firstVerse.split('.');
+    if (verseParts.length >= 2) {
+      const bookChapter = `${verseParts[0]} ${verseParts[1]}`;
+      const epoch = epochData.find(e => e.first_reference_id && e.first_reference_id.startsWith(bookChapter));
+      if (epoch) personEpoch = epoch.epoch_name || 'Not listed';
+    }
+  }
+
+  // Find events (cross-reference person verses with event verses)
+  const personEventVerses = personVerses.map(pv => pv.verse_id);
+  const personEvents = eventData.filter(event => event.first_reference_id && personEventVerses.includes(event.first_reference_id));
+
+  // Find associated places (cross-reference person verses with place verses)
+  const personPlaces = [];
+  personVerses.forEach(pv => {
+    const matchingPlaces = placeVerseData.filter(pv2 => pv2.verse_id === pv.verse_id);
+    matchingPlaces.forEach(place => {
+      if (!personPlaces.includes(place.place_id)) personPlaces.push(place.place_id);
+    });
+  });
+
+  // Find name meaning from Hitchcock's dictionary
+  const nameMeaning = hitchcocksData.find(h => h.name && h.name.toLowerCase() === person.person_name.toLowerCase());
 
   const combinedPerson = {
     person_name: person.person_name,
@@ -122,7 +169,13 @@ async function fetchPersonDetails(person) {
     children: findChildren(person.person_name),
     labels: personLabels,
     relationships: personRelationships,
-    verses: personVerses
+    verses: personVerses,
+    versesApostolic: personVersesApostolic,
+    versesTanakh: personVersesTanakh,
+    epoch: personEpoch,
+    events: personEvents,
+    places: personPlaces,
+    nameMeaning: nameMeaning ? nameMeaning.meaning : 'Not listed'
   };
 
   peopleCache.set(person.person_name, combinedPerson);
@@ -143,10 +196,12 @@ function showPersonDetails(person) {
   let profileHTML = `
     <h2>${person.person_name}</h2>
     <p><strong>ID:</strong> ${person.person_id}</p>
+    <p><strong>Name Meaning:</strong> ${person.nameMeaning}</p>
     <p><strong>Surname:</strong> ${person.surname}</p>
     <p><strong>Unique Attribute:</strong> ${person.unique_attribute}</p>
     <p><strong>Sex:</strong> ${person.sex}</p>
     <p><strong>Tribe:</strong> ${person.tribe}</p>
+    <p><strong>Epoch:</strong> ${person.epoch}</p>
     <p><strong>Notes:</strong> ${person.person_notes}</p>
     <p><strong>Instance:</strong> ${person.person_instance}</p>
     <p><strong>Sequence:</strong> ${person.person_sequence}</p>
@@ -157,7 +212,7 @@ function showPersonDetails(person) {
     <p><strong>Last Verse:</strong> ${person.lastVerse}</p>
   `;
 
-  // Add alternative names/titles from JSON (collapsible)
+  // Alternative names/titles (collapsible)
   if (person.labels && person.labels.length > 0) {
     profileHTML += `
       <h3><button class="collapsible">Alternative Names/Titles (${person.labels.length})</button></h3>
@@ -180,7 +235,7 @@ function showPersonDetails(person) {
     profileHTML += `<p>No alternative names or titles found.</p>`;
   }
 
-  // Add relationships from BibleData-PersonRelationship.csv (collapsible)
+  // Relationships (collapsible)
   if (person.relationships && person.relationships.length > 0) {
     profileHTML += `
       <h3><button class="collapsible">Relationships (${person.relationships.length})</button></h3>
@@ -204,13 +259,47 @@ function showPersonDetails(person) {
     profileHTML += `<p>No additional relationships found.</p>`;
   }
 
-  // Add verses mentioned from BibleData-PersonVerse.csv (collapsible)
-  if (person.verses && person.verses.length > 0) {
+  // Events (collapsible)
+  if (person.events && person.events.length > 0) {
     profileHTML += `
-      <h3><button class="collapsible">Verses Mentioned (${person.verses.length})</button></h3>
+      <h3><button class="collapsible">Events (${person.events.length})</button></h3>
       <div class="collapsible-content"><ul>
     `;
-    person.verses.forEach(verse => {
+    person.events.forEach(event => {
+      profileHTML += `
+        <li>
+          ${event.event_name || 'Unnamed Event'}<br>
+          <strong>Reference:</strong> ${event.first_reference_id || 'Not listed'}<br>
+          ${event.event_notes ? `<strong>Notes:</strong> ${event.event_notes}` : ''}
+        </li>
+      `;
+    });
+    profileHTML += `</ul></div>`;
+  } else {
+    profileHTML += `<p>No events found.</p>`;
+  }
+
+  // Associated Places (collapsible)
+  if (person.places && person.places.length > 0) {
+    profileHTML += `
+      <h3><button class="collapsible">Associated Places (${person.places.length})</button></h3>
+      <div class="collapsible-content"><ul>
+    `;
+    person.places.forEach(placeId => {
+      profileHTML += `<li>${placeId}</li>`;
+    });
+    profileHTML += `</ul></div>`;
+  } else {
+    profileHTML += `<p>No associated places found.</p>`;
+  }
+
+  // Verses Mentioned - Tanakh (collapsible)
+  if (person.versesTanakh && person.versesTanakh.length > 0) {
+    profileHTML += `
+      <h3><button class="collapsible">Verses Mentioned (Tanakh) (${person.versesTanakh.length})</button></h3>
+      <div class="collapsible-content"><ul>
+    `;
+    person.versesTanakh.forEach(verse => {
       profileHTML += `
         <li>
           ${verse.verse_id}<br>
@@ -220,7 +309,26 @@ function showPersonDetails(person) {
     });
     profileHTML += `</ul></div>`;
   } else {
-    profileHTML += `<p>No additional verses found.</p>`;
+    profileHTML += `<p>No verses found in Tanakh.</p>`;
+  }
+
+  // Verses Mentioned - Apostolic (collapsible)
+  if (person.versesApostolic && person.versesApostolic.length > 0) {
+    profileHTML += `
+      <h3><button class="collapsible">Verses Mentioned (Apostolic) (${person.versesApostolic.length})</button></h3>
+      <div class="collapsible-content"><ul>
+    `;
+    person.versesApostolic.forEach(verse => {
+      profileHTML += `
+        <li>
+          ${verse.verse_id}<br>
+          ${verse.person_verse_notes ? `<strong>Notes:</strong> ${verse.person_verse_notes}` : ''}
+        </li>
+      `;
+    });
+    profileHTML += `</ul></div>`;
+  } else {
+    profileHTML += `<p>No verses found in Apostolic books.</p>`;
   }
 
   profileDiv.innerHTML = profileHTML;
