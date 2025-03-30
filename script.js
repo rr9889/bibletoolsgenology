@@ -1,15 +1,17 @@
-// Local CSV file (relative path for GitHub)
+// Local CSV and JSON files (relative paths for GitHub)
 const CSV_FILE = './BibleData-Person.csv';
+const JSON_FILE = './BibleData-PersonLabel.json';
 
 // Data storage
-let peopleData = [];
+let peopleData = []; // From CSV
+let labelData = [];  // From JSON
 const peopleCache = new Map();
 
 // Initialize the app
 initApp();
 
 async function initApp() {
-  await loadCSVData();
+  await Promise.all([loadCSVData(), loadJSONData()]);
   setupSearch();
 }
 
@@ -30,6 +32,18 @@ async function loadCSVData() {
       }
     });
   });
+}
+
+// Load JSON data using Fetch API
+async function loadJSONData() {
+  try {
+    const response = await fetch(JSON_FILE);
+    if (!response.ok) throw new Error(`Failed to fetch ${JSON_FILE}: ${response.statusText}`);
+    labelData = await response.json();
+  } catch (err) {
+    console.error(err);
+    labelData = []; // Fallback to empty array if JSON fails
+  }
 }
 
 // Set up search functionality using Fuse.js
@@ -70,7 +84,7 @@ function setupSearch() {
   });
 }
 
-// Fetch person details using CSV data only
+// Fetch person details using CSV and JSON data
 async function fetchPersonDetails(person) {
   if (peopleCache.has(person.person_name)) {
     showPersonDetails(peopleCache.get(person.person_name));
@@ -79,6 +93,9 @@ async function fetchPersonDetails(person) {
 
   // Find the corresponding record from the CSV data
   const csvPerson = peopleData.find(p => p.person_name === person.person_name) || {};
+
+  // Find all labels from the JSON data using person_id
+  const personLabels = labelData.filter(label => label.person_id === csvPerson.person_id);
 
   const combinedPerson = {
     person_name: person.person_name,
@@ -94,7 +111,8 @@ async function fetchPersonDetails(person) {
     mother: csvPerson.mother || 'Not listed',
     firstVerse: csvPerson.firstVerse || 'Not listed',
     lastVerse: csvPerson.lastVerse || 'Not listed',
-    children: findChildren(person.person_name)
+    children: findChildren(person.person_name),
+    labels: personLabels // Add the labels from JSON
   };
 
   peopleCache.set(person.person_name, combinedPerson);
@@ -111,7 +129,9 @@ function findChildren(name) {
 // Display person details in the profile section
 function showPersonDetails(person) {
   const profileDiv = document.getElementById('profile');
-  profileDiv.innerHTML = `
+  
+  // Basic info from CSV
+  let profileHTML = `
     <h2>${person.person_name}</h2>
     <p><strong>ID:</strong> ${person.person_id}</p>
     <p><strong>Surname:</strong> ${person.surname}</p>
@@ -127,6 +147,28 @@ function showPersonDetails(person) {
     <p><strong>First Verse:</strong> ${person.firstVerse}</p>
     <p><strong>Last Verse:</strong> ${person.lastVerse}</p>
   `;
+
+  // Add alternative names/titles from JSON
+  if (person.labels && person.labels.length > 0) {
+    profileHTML += `<h3>Alternative Names/Titles</h3><ul>`;
+    person.labels.forEach(label => {
+      profileHTML += `
+        <li>
+          <strong>${label.english_label}</strong> (${label.label_type})<br>
+          <strong>Hebrew:</strong> ${label.hebrew_label} (${label.hebrew_label_transliterated}) - ${label.hebrew_label_meaning || 'No meaning provided'} [Strong's ${label.hebrew_strongs_number || 'N/A'}]<br>
+          <strong>Greek:</strong> ${label.greek_label} (${label.greek_label_transliterated}) - ${label.greek_label_meaning || 'No meaning provided'} [Strong's ${label.greek_strongs_number || 'N/A'}]<br>
+          <strong>Reference:</strong> ${label.label_reference_id}<br>
+          <strong>Given by God:</strong> ${label.label_given_by_god === 'Y' ? 'Yes' : 'No'}<br>
+          ${label.label_notes ? `<strong>Notes:</strong> ${label.label_notes}` : ''}
+        </li>
+      `;
+    });
+    profileHTML += `</ul>`;
+  } else {
+    profileHTML += `<p>No alternative names or titles found.</p>`;
+  }
+
+  profileDiv.innerHTML = profileHTML;
   profileDiv.classList.add('active');
 
   drawFamilyTree(person);
