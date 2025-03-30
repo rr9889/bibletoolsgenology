@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Most Used Words in the Bible (KJV)</title>
+    <title>Most Used Words in the Bible (NIV)</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -23,7 +23,7 @@
         #filters label {
             margin-right: 10px;
         }
-        #filters select, #filters input {
+        #filters input {
             margin: 5px;
             padding: 5px;
         }
@@ -96,11 +96,8 @@
 </head>
 <body>
     <div id="filters">
-        <label for="book-select">Book:</label>
-        <select id="book-select">
-            <option value="all">All Books</option>
-            <!-- Options will be populated dynamically -->
-        </select>
+        <label for="word-count">Number of Words:</label>
+        <input type="number" id="word-count" min="1" value="50" style="width: 60px;">
         <br>
         <label for="include-words">Include Words (comma-separated):</label>
         <input type="text" id="include-words" placeholder="e.g., lord, god">
@@ -119,40 +116,30 @@
     </div>
 
     <script>
-        // Fetch Bible JSON from GitHub
+        // Fetch NIV Bible JSON from GitHub
         async function fetchBibleData() {
             try {
-                const response = await fetch('https://raw.githubusercontent.com/thiagobodruk/bible/master/json/en_kjv.json');
-                if (!response.ok) throw new Error('Failed to fetch Bible JSON');
+                const response = await fetch('https://raw.githubusercontent.com/jadenzaleski/BibleTranslations/master/NIV/NIV_bible.json');
+                if (!response.ok) throw new Error('Failed to fetch NIV Bible JSON');
                 return await response.json();
             } catch (e) {
                 throw new Error('Could not load Bible data: ' + e.message);
             }
         }
 
-        // Populate book dropdown
-        async function populateBookDropdown() {
-            const bibleData = await fetchBibleData();
-            const bookSelect = document.getElementById('book-select');
-            bibleData.forEach(book => {
-                const option = document.createElement('option');
-                option.value = book.book;
-                option.textContent = book.book;
-                bookSelect.appendChild(option);
-            });
-            return bibleData; // Return data for further use
-        }
-
         // Process Bible JSON into word frequencies with filters
-        function processBibleData(bibleData, selectedBook, includeWords, excludeWords) {
-            // Default stop words
+        function processBibleData(bibleData, wordLimit, includeWords, excludeWords) {
+            // Default stop words with additional exclusions
             const defaultStopWords = new Set([
                 "the", "and", "that", "shall", "for", "unto", "his", "they", "him",
                 "in", "of", "to", "he", "was", "is", "it", "with", "be", "not",
                 "all", "have", "thou", "thy", "ye", "from", "upon", "which",
                 "but", "as", "are", "were", "their", "this", "my", "me", "by",
                 "said", "will", "out", "on", "into", "when", "then", "them",
-                "her", "there", "at", "had", "you", "do", "so", "an", "or"
+                "her", "there", "at", "had", "you", "do", "so", "an", "or",
+                "against", "shalt", "hand", "let", "made", "saying", "went",
+                "even", "now", "behold", "every", "saith", "after", "because",
+                "these", "therefore", "things", "our"
             ]);
 
             // Custom filters
@@ -160,14 +147,8 @@
             const excludeSet = excludeWords ? new Set(excludeWords.split(',').map(w => w.trim().toLowerCase())) : defaultStopWords;
 
             let text = "";
-            bibleData.forEach(book => {
-                if (selectedBook === 'all' || book.book === selectedBook) {
-                    book.chapters.forEach(chapter => {
-                        chapter.forEach(verse => {
-                            text += verse + " ";
-                        });
-                    });
-                }
+            bibleData.forEach(verse => {
+                text += verse.text + " ";
             });
 
             const words = text.toLowerCase()
@@ -181,29 +162,31 @@
                 wordCount[word] = (wordCount[word] || 0) + 1;
             });
 
-            return Object.entries(wordCount)
-                .map(([word, count]) => ({ word, count }))
-                .sort((a, b) => b.count - a.count)
-                .slice(0, 100); // Top 100 words
+            return {
+                wordData: Object.entries(wordCount)
+                    .map(([word, count]) => ({ word, count }))
+                    .sort((a, b) => b.count - a.count)
+                    .slice(0, wordLimit || 50), // Use specified limit or default to 50
+                totalWords: words.length // Total filtered words for percentage
+            };
         }
 
         // Fetch and process word data with filters
-        async function fetchWordData(bibleData, selectedBook, includeWords, excludeWords) {
-            return processBibleData(bibleData, selectedBook, includeWords, excludeWords);
+        async function fetchWordData(bibleData, wordLimit, includeWords, excludeWords) {
+            return processBibleData(bibleData, wordLimit, includeWords, excludeWords);
         }
 
         // Display words
         async function displayWords(bibleData) {
             const wordCloud = document.getElementById('word-cloud');
-            const selectedBook = document.getElementById('book-select').value;
+            const wordLimit = parseInt(document.getElementById('word-count').value) || 50;
             const includeWords = document.getElementById('include-words').value;
             const excludeWords = document.getElementById('exclude-words').value;
 
             try {
-                const wordData = await fetchWordData(bibleData, selectedBook, includeWords, excludeWords);
+                const { wordData, totalWords } = await fetchWordData(bibleData, wordLimit, includeWords, excludeWords);
                 window.wordData = wordData; // Store globally for popup access
                 const maxCount = Math.max(...wordData.map(w => w.count));
-                const totalWords = selectedBook === 'all' ? 788258 : calculateBookWordCount(bibleData, selectedBook);
 
                 wordCloud.innerHTML = ""; // Clear previous content
                 wordData.forEach(item => {
@@ -219,21 +202,6 @@
                 console.error(e);
                 wordCloud.innerHTML = `<div id="error-message">${e.message}</div>`;
             }
-        }
-
-        // Calculate total words for a specific book
-        function calculateBookWordCount(bibleData, selectedBook) {
-            let text = "";
-            bibleData.forEach(book => {
-                if (book.book === selectedBook) {
-                    book.chapters.forEach(chapter => {
-                        chapter.forEach(verse => {
-                            text += verse + " ";
-                        });
-                    });
-                }
-            });
-            return text.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/).length;
         }
 
         // Show popup with stats
@@ -266,8 +234,8 @@
 
         // Initialize and set up filters
         async function initialize() {
-            const bibleData = await populateBookDropdown();
-            displayWords(bibleData); // Initial display with all books
+            const bibleData = await fetchBibleData();
+            displayWords(bibleData); // Initial display
             document.getElementById('apply-filters').addEventListener('click', () => displayWords(bibleData));
         }
 
