@@ -163,22 +163,22 @@
         }
 
         // Function to show popup with stats
-        function showPopup(item, totalWords) {
-            const popup = document.getElementById('popup');
-            const overlay = document.getElementById('overlay');
-            const title = document.getElementById('popup-title');
-            const content = document.getElementById('popup-content');
+  function showPopup(item, totalWords) {
+    const popup = document.getElementById('popup');
+    const overlay = document.getElementById('overlay');
+    const title = document.getElementById('popup-title');
+    const content = document.getElementById('popup-content');
 
-            title.textContent = item.word;
-            content.innerHTML = `
-                <strong>Occurrences:</strong> ${item.count} times<br>
-                <strong>Percentage of total words:</strong> ${(item.count / totalWords * 100).toFixed(2)}%<br>
-                <strong>Rank:</strong> ${wordData.findIndex(w => w.word === item.word) + 1}
-            `;
+    title.textContent = item.word;
+    content.innerHTML = `
+        <strong>Occurrences:</strong> ${item.count} times<br>
+        <strong>Percentage of total words:</strong> ${(item.count / totalWords * 100).toFixed(2)}%<br>
+        <strong>Rank:</strong> ${wordData.indexOf(item) + 1}
+    `;
 
-            popup.style.display = 'block';
-            overlay.style.display = 'block';
-        }
+    popup.style.display = 'block';
+    overlay.style.display = 'block';
+}
 
         // Close popup functionality
         document.getElementById('popup-close').addEventListener('click', () => {
