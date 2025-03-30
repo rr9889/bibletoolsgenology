@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Most Used Biblical Names, Locations, and Terms (NIV)</title>
+    <title>Biblical Word Cloud (NIV)</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -37,6 +37,20 @@
         #filters button:hover {
             background-color: #0056b3;
         }
+        #tabs {
+            margin-bottom: 20px;
+        }
+        #tabs button {
+            padding: 10px 20px;
+            margin: 0 5px;
+            background-color: #ddd;
+            border: none;
+            cursor: pointer;
+        }
+        #tabs button.active {
+            background-color: #007BFF;
+            color: white;
+        }
         #word-cloud {
             text-align: center;
             max-width: 90%;
@@ -50,6 +64,7 @@
             display: inline-block;
             transition: transform 0.2s;
             padding: 5px;
+            white-space: nowrap;
         }
         .word:hover {
             transform: scale(1.1);
@@ -96,16 +111,23 @@
 </head>
 <body>
     <div id="filters">
-        <label for="word-count">Number of Words:</label>
-        <input type="number" id="word-count" min="1" value="50" style="width: 60px;">
+        <label for="item-count">Number of Items:</label>
+        <input type="number" id="item-count" min="1" value="50" style="width: 60px;">
         <br>
-        <label for="include-words">Include Words (comma-separated):</label>
-        <input type="text" id="include-words" placeholder="e.g., jesus, jerusalem">
+        <label for="include-items">Include Items (comma-separated):</label>
+        <input type="text" id="include-items" placeholder="e.g., jesus, jerusalem">
         <br>
-        <label for="exclude-words">Exclude Words (comma-separated):</label>
-        <input type="text" id="exclude-words" placeholder="e.g., day, time">
+        <label for="exclude-items">Exclude Items (comma-separated):</label>
+        <input type="text" id="exclude-items" placeholder="e.g., day, time">
         <br>
         <button id="apply-filters">Apply Filters</button>
+    </div>
+    <div id="tabs">
+        <button id="tab-words" class="active">Words</button>
+        <button id="tab-phrases">Phrases</button>
+        <button id="tab-names">Names</button>
+        <button id="tab-locations">Locations</button>
+        <button id="tab-terms">Religious Terms</button>
     </div>
     <div id="overlay"></div>
     <div id="word-cloud"></div>
@@ -127,27 +149,28 @@
             }
         }
 
-        // Process Bible JSON into word frequencies, filtering for names, locations, and glossary terms
-        function processBibleData(bibleData, wordLimit, includeWords, excludeWords) {
-            // Sample glossary of biblical names, locations, and key terms
-            const biblicalGlossary = new Set([
-                // Names (People)
+        // Process Bible JSON based on section type
+        function processBibleData(bibleData, itemLimit, includeItems, excludeItems, section) {
+            // Split glossary into categories
+            const names = new Set([
                 "jesus", "moses", "abraham", "david", "solomon", "joseph", "mary", "paul", "peter", "john",
                 "isaac", "jacob", "sarah", "noah", "samuel", "elijah", "elisha", "daniel", "jonah", "adam",
-                "eve", "cain", "abel", "esau", "ruth", "esther", "job", "isaiah", "jeremiah", "ezekiel",
-                // Locations
+                "eve", "cain", "abel", "esau", "ruth", "esther", "job", "isaiah", "jeremiah", "ezekiel"
+            ]);
+            const locations = new Set([
                 "jerusalem", "egypt", "israel", "judah", "babylon", "canaan", "bethlehem", "nazareth", "galilee",
                 "samaria", "sinai", "jordan", "zion", "gilead", "moab", "edom", "philistia", "syria", "assyria",
-                "persia", "gaza", "hebron", "damascus", "capernaum", "bethel", "joppa", "tyre", "sidon",
-                // Key Biblical Terms
+                "persia", "gaza", "hebron", "damascus", "capernaum", "bethel", "joppa", "tyre", "sidon"
+            ]);
+            const religiousTerms = new Set([
                 "god", "lord", "spirit", "covenant", "sin", "grace", "faith", "salvation", "kingdom", "heaven",
                 "hell", "priest", "prophet", "king", "temple", "altar", "sacrifice", "law", "mercy", "judgment",
                 "peace", "love", "hope", "truth", "righteousness", "blessing", "curse", "sabbath", "church"
             ]);
 
             // Custom filters
-            const includeSet = includeWords ? new Set(includeWords.split(',').map(w => w.trim().toLowerCase())) : null;
-            const excludeSet = excludeWords ? new Set(excludeWords.split(',').map(w => w.trim().toLowerCase())) : new Set();
+            const includeSet = includeItems ? new Set(includeItems.split(',').map(i => i.trim().toLowerCase())) : null;
+            const excludeSet = excludeItems ? new Set(excludeItems.split(',').map(i => i.trim().toLowerCase())) : new Set();
 
             let text = "";
             for (const book in bibleData) {
@@ -163,48 +186,90 @@
             const words = text.toLowerCase()
                 .replace(/[^\w\s]/g, '')
                 .split(/\s+/)
-                .filter(word => word.length > 2)
-                .filter(word => (biblicalGlossary.has(word) || (includeSet && includeSet.has(word))) && !excludeSet.has(word));
+                .filter(word => word.length > 2);
 
-            const wordCount = {};
-            words.forEach(word => {
-                wordCount[word] = (wordCount[word] || 0) + 1;
-            });
+            let items = [];
+            let totalItems = 0;
+
+            if (section === 'phrases') {
+                // Two-word phrases
+                for (let i = 0; i < words.length - 1; i++) {
+                    const phrase = `${words[i]} ${words[i + 1]}`;
+                    const phraseWords = phrase.split(' ');
+                    const relevantSets = [names, locations, religiousTerms];
+                    if (phraseWords.some(word => relevantSets.some(set => set.has(word))) || (includeSet && includeSet.has(phrase))) {
+                        if (!excludeSet.has(phrase)) {
+                            items.push(phrase);
+                        }
+                    }
+                }
+                totalItems = items.length;
+                const phraseCount = {};
+                items.forEach(item => {
+                    phraseCount[item] = (phraseCount[item] || 0) + 1;
+                });
+                items = Object.entries(phraseCount)
+                    .map(([phrase, count]) => ({ item: phrase, count }))
+                    .sort((a, b) => b.count - a.count);
+            } else {
+                // Single words
+                let filterSet;
+                switch (section) {
+                    case 'words':
+                        filterSet = null; // All words, no specific filter
+                        break;
+                    case 'names':
+                        filterSet = names;
+                        break;
+                    case 'locations':
+                        filterSet = locations;
+                        break;
+                    case 'terms':
+                        filterSet = religiousTerms;
+                        break;
+                }
+                items = words.filter(word => (!filterSet || filterSet.has(word) || (includeSet && includeSet.has(word))) && !excludeSet.has(word));
+                totalItems = items.length;
+                const wordCount = {};
+                items.forEach(item => {
+                    wordCount[item] = (wordCount[item] || 0) + 1;
+                });
+                items = Object.entries(wordCount)
+                    .map(([word, count]) => ({ item: word, count }))
+                    .sort((a, b) => b.count - a.count);
+            }
 
             return {
-                wordData: Object.entries(wordCount)
-                    .map(([word, count]) => ({ word, count }))
-                    .sort((a, b) => b.count - a.count)
-                    .slice(0, wordLimit || 50), // Use specified limit or default to 50
-                totalWords: words.length // Total filtered words for percentage
+                itemData: items.slice(0, itemLimit || 50),
+                totalItems: totalItems
             };
         }
 
-        // Fetch and process word data with filters
-        async function fetchWordData(bibleData, wordLimit, includeWords, excludeWords) {
-            return processBibleData(bibleData, wordLimit, includeWords, excludeWords);
+        // Fetch and process data with filters
+        async function fetchItemData(bibleData, itemLimit, includeItems, excludeItems, section) {
+            return processBibleData(bibleData, itemLimit, includeItems, excludeItems, section);
         }
 
-        // Display words
-        async function displayWords(bibleData) {
+        // Display items
+        async function displayItems(bibleData, section) {
             const wordCloud = document.getElementById('word-cloud');
-            const wordLimit = parseInt(document.getElementById('word-count').value) || 50;
-            const includeWords = document.getElementById('include-words').value;
-            const excludeWords = document.getElementById('exclude-words').value;
+            const itemLimit = parseInt(document.getElementById('item-count').value) || 50;
+            const includeItems = document.getElementById('include-items').value;
+            const excludeItems = document.getElementById('exclude-items').value;
 
             try {
-                const { wordData, totalWords } = await fetchWordData(bibleData, wordLimit, includeWords, excludeWords);
-                window.wordData = wordData; // Store globally for popup access
-                const maxCount = Math.max(...wordData.map(w => w.count));
+                const { itemData, totalItems } = await fetchItemData(bibleData, itemLimit, includeItems, excludeItems, section);
+                window.itemData = itemData; // Store globally for popup access
+                const maxCount = Math.max(...itemData.map(i => i.count));
 
                 wordCloud.innerHTML = ""; // Clear previous content
-                wordData.forEach(item => {
+                itemData.forEach(item => {
                     const span = document.createElement('span');
                     span.className = 'word';
-                    span.textContent = item.word;
+                    span.textContent = item.item;
                     const fontSize = (item.count / maxCount) * 60 + 10;
                     span.style.fontSize = `${fontSize}px`;
-                    span.addEventListener('click', () => showPopup(item, totalWords));
+                    span.addEventListener('click', () => showPopup(item, totalItems));
                     wordCloud.appendChild(span);
                 });
             } catch (e) {
@@ -214,17 +279,17 @@
         }
 
         // Show popup with stats
-        function showPopup(item, totalWords) {
+        function showPopup(item, totalItems) {
             const popup = document.getElementById('popup');
             const overlay = document.getElementById('overlay');
             const title = document.getElementById('popup-title');
             const content = document.getElementById('popup-content');
 
-            title.textContent = item.word;
+            title.textContent = item.item;
             content.innerHTML = `
                 <strong>Occurrences:</strong> ${item.count} times<br>
-                <strong>Percentage:</strong> ${(item.count / totalWords * 100).toFixed(2)}%<br>
-                <strong>Rank:</strong> ${window.wordData.findIndex(w => w.word === item.word) + 1}
+                <strong>Percentage:</strong> ${(item.count / totalItems * 100).toFixed(2)}%<br>
+                <strong>Rank:</strong> ${window.itemData.findIndex(i => i.item === item.item) + 1}
             `;
 
             popup.style.display = 'block';
@@ -241,11 +306,27 @@
             document.getElementById('overlay').style.display = 'none';
         });
 
-        // Initialize and set up filters
+        // Initialize and set up tabs/filters
         async function initialize() {
             const bibleData = await fetchBibleData();
-            displayWords(bibleData); // Initial display
-            document.getElementById('apply-filters').addEventListener('click', () => displayWords(bibleData));
+            let currentSection = 'words';
+
+            // Initial display
+            displayItems(bibleData, currentSection);
+
+            // Tab switching
+            const tabs = document.querySelectorAll('#tabs button');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    currentSection = tab.id.replace('tab-', '');
+                    displayItems(bibleData, currentSection);
+                });
+            });
+
+            // Apply filters
+            document.getElementById('apply-filters').addEventListener('click', () => displayItems(bibleData, currentSection));
         }
 
         initialize();
