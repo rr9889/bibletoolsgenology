@@ -3,39 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Genealogy Scroll - Bible Characters</title>
+  <title>Genealogy Scroll</title>
   <link rel="stylesheet" href="./style.css">
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://unpkg.com/fuse.js@6.4.6/dist/fuse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
 </head>
 <body>
-  <div class="container">
-    <h1>Genealogy Scroll - Bible Characters</h1>
-    
-    <!-- Search Section -->
-    <div class="search-section">
-      <input type="text" id="search" placeholder="Search for a Bible character (e.g., Adam, YHVH)">
-      <button id="search-btn">Search</button>
-    </div>
-    
-    <!-- Results Section -->
-    <div id="results" class="results-section"></div>
-    
-    <!-- Profile Section -->
-    <div id="profile" class="profile-section">
-      <!-- Profile content will be dynamically inserted here -->
-    </div>
-    
-    <!-- Family Tree Section -->
-    <div id="family-tree" class="family-tree-section">
-      <!-- Family tree will be dynamically inserted here -->
-    </div>
+  <h1>Genealogy Scroll</h1>
+  <div class="search-container">
+    <input type="text" id="search" placeholder="Search for a biblical figure...">
+    <button id="search-btn">Search</button>
   </div>
-
-  <!-- External Libraries -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.6.2/fuse.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
-  <script src="https://d3js.org/d3.v7.min.js"></script>
-  
-  <!-- Local Scripts -->
+  <div id="results"></div>
+  <div id="profile" class="profile"></div>
+  <div id="family-tree"></div>
   <script src="./script.js"></script>
 </body>
 </html>
