@@ -1,14 +1,14 @@
-// File paths (relative, since all files are in the same directory)
-const CSV_PERSON_FILE = './BibleData-Person.csv';
+// File paths (all JSON now)
+const JSON_PERSON_FILE = './BibleData-Person.json';
 const JSON_LABEL_FILE = './BibleData-PersonLabel.json';
-const CSV_RELATIONSHIP_FILE = './BibleData-PersonRelationship.csv';
-const CSV_PERSONVERSE_FILE = './BibleData-PersonVerse.csv';
-const CSV_PERSONVERSE_APOSTOLIC_FILE = './BibleData-PersonVerseApostolic.csv';
-const CSV_PERSONVERSE_TANAKH_FILE = './BibleData-PersonVerseTanakh.csv';
-const CSV_EPOCH_FILE = './BibleData-Epoch.csv';
-const CSV_EVENT_FILE = './BibleData-Event.csv';
-const CSV_PLACEVERSE_FILE = './BibleData-PlaceVerse.csv';
-const CSV_HITCHCOCKS_FILE = './HitchcocksBibleNamesDictionary.csv';
+const JSON_RELATIONSHIP_FILE = './BibleData-PersonRelationship.json';
+const JSON_PERSONVERSE_FILE = './BibleData-PersonVerse.json';
+const JSON_PERSONVERSE_APOSTOLIC_FILE = './BibleData-PersonVerseApostolic.json';
+const JSON_PERSONVERSE_TANAKH_FILE = './BibleData-PersonVerseTanakh.json';
+const JSON_EPOCH_FILE = './BibleData-Epoch.json';
+const JSON_EVENT_FILE = './BibleData-Event.json';
+const JSON_PLACEVERSE_FILE = './BibleData-PlaceVerse.json';
+const JSON_HITCHCOCKS_FILE = './HitchcocksBibleNamesDictionary.json';
 
 // Data storage
 let peopleData = [];
@@ -28,49 +28,31 @@ initApp();
 
 async function initApp() {
   await Promise.all([
-    loadCSVData(CSV_PERSON_FILE, data => peopleData = data),
-    loadJSONData(),
-    loadCSVData(CSV_RELATIONSHIP_FILE, data => relationshipData = data),
-    loadCSVData(CSV_PERSONVERSE_FILE, data => personVerseData = data),
-    loadCSVData(CSV_PERSONVERSE_APOSTOLIC_FILE, data => personVerseApostolicData = data),
-    loadCSVData(CSV_PERSONVERSE_TANAKH_FILE, data => personVerseTanakhData = data),
-    loadCSVData(CSV_EPOCH_FILE, data => epochData = data),
-    loadCSVData(CSV_EVENT_FILE, data => eventData = data),
-    loadCSVData(CSV_PLACEVERSE_FILE, data => placeVerseData = data),
-    loadCSVData(CSV_HITCHCOCKS_FILE, data => hitchcocksData = data)
+    loadJSONData(JSON_PERSON_FILE, data => peopleData = data),
+    loadJSONData(JSON_LABEL_FILE, data => labelData = data),
+    loadJSONData(JSON_RELATIONSHIP_FILE, data => relationshipData = data),
+    loadJSONData(JSON_PERSONVERSE_FILE, data => personVerseData = data),
+    loadJSONData(JSON_PERSONVERSE_APOSTOLIC_FILE, data => personVerseApostolicData = data),
+    loadJSONData(JSON_PERSONVERSE_TANAKH_FILE, data => personVerseTanakhData = data),
+    loadJSONData(JSON_EPOCH_FILE, data => epochData = data),
+    loadJSONData(JSON_EVENT_FILE, data => eventData = data),
+    loadJSONData(JSON_PLACEVERSE_FILE, data => placeVerseData = data),
+    loadJSONData(JSON_HITCHCOCKS_FILE, data => hitchcocksData = data)
   ]);
   setupSearch();
 }
 
-// Load CSV data using PapaParse
-async function loadCSVData(file, callback) {
-  return new Promise((resolve) => {
-    Papa.parse(file, {
-      download: true,
-      header: true,
-      complete: (results) => {
-        const data = results.data.filter(row => Object.keys(row).length > 0);
-        callback(data);
-        resolve();
-      },
-      error: (err) => {
-        console.error(`Failed to load ${file}: ${err}`);
-        callback([]);
-        resolve();
-      }
-    });
-  });
-}
-
 // Load JSON data using Fetch API
-async function loadJSONData() {
+async function loadJSONData(file, callback) {
   try {
-    const response = await fetch(JSON_LABEL_FILE);
-    if (!response.ok) throw new Error(`Failed to fetch ${JSON_LABEL_FILE}: ${response.statusText}`);
-    labelData = await response.json();
+    const response = await fetch(file);
+    if (!response.ok) throw new Error(`Failed to fetch ${file}: ${response.statusText}`);
+    const data = await response.json();
+    console.log(`Loaded ${file}: ${data.length} entries`); // Debug log
+    callback(data);
   } catch (err) {
     console.error(err);
-    labelData = [];
+    callback([]);
   }
 }
 
@@ -90,7 +72,7 @@ function setupSearch() {
     }
 
     const csvResults = fuse.search(query);
-    const combinedResults = csvResults.map(r => r.item);
+    const combinedResults = csvResults.map(r => r.item).slice(0, 4); // Limit to 4 results
 
     if (combinedResults.length === 0) {
       resultsDiv.innerHTML = '<p>No biblical figures found.</p>';
@@ -119,26 +101,45 @@ async function fetchPersonDetails(person) {
   }
 
   const csvPerson = peopleData.find(p => p.person_name === person.person_name) || {};
+  console.log('Raw data for person:', csvPerson); // Debug log
+
   const personLabels = labelData.filter(label => label.person_id === csvPerson.person_id);
+  console.log('Labels:', personLabels);
+
   const personRelationships = relationshipData.filter(rel => rel.person_id_1 === csvPerson.person_id || rel.person_id_2 === csvPerson.person_id);
+  console.log('Relationships:', personRelationships);
+
   const personVerses = personVerseData.filter(pv => pv.person_id === csvPerson.person_id);
+  console.log('Verses (All):', personVerses);
+
   const personVersesApostolic = personVerseApostolicData.filter(pv => pv.person_id === csvPerson.person_id);
+  console.log('Verses (Apostolic):', personVersesApostolic);
+
   const personVersesTanakh = personVerseTanakhData.filter(pv => pv.person_id === csvPerson.person_id);
+  console.log('Verses (Tanakh):', personVersesTanakh);
 
   // Find the epoch (based on firstVerse)
   let personEpoch = 'Not listed';
   if (csvPerson.firstVerse) {
     const verseParts = csvPerson.firstVerse.split('.');
     if (verseParts.length >= 2) {
-      const bookChapter = `${verseParts[0]} ${verseParts[1]}`;
-      const epoch = epochData.find(e => e.first_reference_id && e.first_reference_id.startsWith(bookChapter));
+      const bookChapter = `${verseParts[0]} ${verseParts[1]}`; // e.g., "GEN 1"
+      const epoch = epochData.find(e => {
+        if (e.first_reference_id) {
+          const epochParts = e.first_reference_id.split(' ');
+          return epochParts.length >= 2 && `${epochParts[0]} ${epochParts[1]}` === bookChapter;
+        }
+        return false;
+      });
       if (epoch) personEpoch = epoch.epoch_name || 'Not listed';
     }
   }
+  console.log('Epoch data for GEN 1:', epochData.filter(e => e.first_reference_id && e.first_reference_id.startsWith('GEN 1')));
 
   // Find events (cross-reference person verses with event verses)
   const personEventVerses = personVerses.map(pv => pv.verse_id);
   const personEvents = eventData.filter(event => event.first_reference_id && personEventVerses.includes(event.first_reference_id));
+  console.log('Events:', personEvents);
 
   // Find associated places (cross-reference person verses with place verses)
   const personPlaces = [];
@@ -148,9 +149,11 @@ async function fetchPersonDetails(person) {
       if (!personPlaces.includes(place.place_id)) personPlaces.push(place.place_id);
     });
   });
+  console.log('Places:', personPlaces);
 
   // Find name meaning from Hitchcock's dictionary
   const nameMeaning = hitchcocksData.find(h => h.name && h.name.toLowerCase() === person.person_name.toLowerCase());
+  console.log('Hitchcocks data for Adam:', hitchcocksData.filter(h => h.name && h.name.toLowerCase().includes('adam')));
 
   const combinedPerson = {
     person_name: person.person_name,
@@ -184,9 +187,11 @@ async function fetchPersonDetails(person) {
 
 // Find children by looking for records where the person is listed as father or mother
 function findChildren(name) {
-  return peopleData
-    .filter(p => p.father === name || p.mother === name)
+  const children = peopleData
+    .filter(p => (p.father && p.father.toLowerCase() === name.toLowerCase()) || (p.mother && p.mother.toLowerCase() === name.toLowerCase()))
     .map(p => p.person_name);
+  console.log(`Children of ${name}:`, children);
+  return children;
 }
 
 // Display person details in the profile section
