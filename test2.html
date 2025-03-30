@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Most Common Biblical Phrases (NIV)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            overflow: auto;
+        }
+        #filters {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        #filters label {
+            margin-right: 10px;
+        }
+        #filters input {
+            margin: 5px;
+            padding: 5px;
+        }
+        #filters button {
+            padding: 5px 10px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        #filters button:hover {
+            background-color: #0056b3;
+        }
+        #word-cloud {
+            text-align: center;
+            max-width: 90%;
+            flex-wrap: wrap;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+        .word {
+            cursor: pointer;
+            display: inline-block;
+            transition: transform 0.2s;
+            padding: 5px;
+            white-space: nowrap; /* Keep phrases on one line */
+        }
+        .word:hover {
+            transform: scale(1.1);
+            color: #007BFF;
+        }
+        #popup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border: 2px solid #333;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            z-index: 1000;
+            max-width: 400px;
+            text-align: left;
+        }
+        #popup-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            cursor: pointer;
+            font-size: 20px;
+            color: #333;
+        }
+        #overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+        }
+        #error-message {
+            color: red;
+            font-size: 18px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="filters">
+        <label for="phrase-count">Number of Phrases:</label>
+        <input type="number" id="phrase-count" min="1" value="50" style="width: 60px;">
+        <br>
+        <label for="include-phrases">Include Phrases (comma-separated):</label>
+        <input type="text" id="include-phrases" placeholder="e.g., jesus christ, the lord">
+        <br>
+        <label for="exclude-phrases">Exclude Phrases (comma-separated):</label>
+        <input type="text" id="exclude-phrases" placeholder="e.g., of the, in the">
+        <br>
+        <button id="apply-filters">Apply Filters</button>
+    </div>
+    <div id="overlay"></div>
+    <div id="word-cloud"></div>
+    <div id="popup">
+        <span id="popup-close">×</span>
+        <h2 id="popup-title"></h2>
+        <p id="popup-content"></p>
+    </div>
+
+    <script>
+        // Fetch NIV Bible JSON from GitHub
+        async function fetchBibleData() {
+            try {
+                const response = await fetch('https://raw.githubusercontent.com/jadenzaleski/BibleTranslations/master/NIV/NIV_bible.json');
+                if (!response.ok) throw new Error('Failed to fetch NIV Bible JSON');
+                return await response.json();
+            } catch (e) {
+                throw new Error('Could not load Bible data: ' + e.message);
+            }
+        }
+
+        // Process Bible JSON into phrase frequencies
+        function processBibleData(bibleData, phraseLimit, includePhrases, excludePhrases) {
+            // Glossary of biblical names, locations, and key terms
+            const biblicalGlossary = new Set([
+                // Names (People)
+                "jesus", "moses", "abraham", "david", "solomon", "joseph", "mary", "paul", "peter", "john",
+                "isaac", "jacob", "sarah", "noah", "samuel", "elijah", "elisha", "daniel", "jonah", "adam",
+                "eve", "cain", "abel", "esau", "ruth", "esther", "job", "isaiah", "jeremiah", "ezekiel",
+                // Locations
+                "jerusalem", "egypt", "israel", "judah", "babylon", "canaan", "bethlehem", "nazareth", "galilee",
+                "samaria", "sinai", "jordan", "zion", "gilead", "moab", "edom", "philistia", "syria", "assyria",
+                "persia", "gaza", "hebron", "damascus", "capernaum", "bethel", "joppa", "tyre", "sidon",
+                // Key Biblical Terms
+                "god", "lord", "spirit", "covenant", "sin", "grace", "faith", "salvation", "kingdom", "heaven",
+                "hell", "priest", "prophet", "king", "temple", "altar", "sacrifice", "law", "mercy", "judgment",
+                "peace", "love", "hope", "truth", "righteousness", "blessing", "curse", "sabbath", "church"
+            ]);
+
+            // Custom filters
+            const includeSet = includePhrases ? new Set(includePhrases.split(',').map(p => p.trim().toLowerCase())) : null;
+            const excludeSet = excludePhrases ? new Set(excludePhrases.split(',').map(p => p.trim().toLowerCase())) : new Set();
+
+            let text = "";
+            for (const book in bibleData) {
+                const chapters = bibleData[book];
+                for (const chapter in chapters) {
+                    const verses = chapters[chapter];
+                    for (const verse in verses) {
+                        text += verses[verse] + " ";
+                    }
+                }
+            }
+
+            // Split into words and create two-word phrases
+            const words = text.toLowerCase()
+                .replace(/[^\w\s]/g, '')
+                .split(/\s+/)
+                .filter(word => word.length > 2);
+
+            const phrases = [];
+            for (let i = 0; i < words.length - 1; i++) {
+                const phrase = `${words[i]} ${words[i + 1]}`;
+                // Include phrase if it contains a glossary term or is explicitly included
+                const phraseWords = phrase.split(' ');
+                if (phraseWords.some(word => biblicalGlossary.has(word)) || (includeSet && includeSet.has(phrase))) {
+                    if (!excludeSet.has(phrase)) {
+                        phrases.push(phrase);
+                    }
+                }
+            }
+
+            const phraseCount = {};
+            phrases.forEach(phrase => {
+                phraseCount[phrase] = (phraseCount[phrase] || 0) + 1;
+            });
+
+            return {
+                phraseData: Object.entries(phraseCount)
+                    .map(([phrase, count]) => ({ phrase, count }))
+                    .sort((a, b) => b.count - a.count)
+                    .slice(0, phraseLimit || 50), // Use specified limit or default to 50
+                totalPhrases: phrases.length // Total filtered phrases for percentage
+            };
+        }
+
+        // Fetch and process phrase data with filters
+        async function fetchPhraseData(bibleData, phraseLimit, includePhrases, excludePhrases) {
+            return processBibleData(bibleData, phraseLimit, includePhrases, excludePhrases);
+        }
+
+        // Display phrases
+        async function displayPhrases(bibleData) {
+            const wordCloud = document.getElementById('word-cloud');
+            const phraseLimit = parseInt(document.getElementById('phrase-count').value) || 50;
+            const includePhrases = document.getElementById('include-phrases').value;
+            const excludePhrases = document.getElementById('exclude-phrases').value;
+
+            try {
+                const { phraseData, totalPhrases } = await fetchPhraseData(bibleData, phraseLimit, includePhrases, excludePhrases);
+                window.phraseData = phraseData; // Store globally for popup access
+                const maxCount = Math.max(...phraseData.map(p => p.count));
+
+                wordCloud.innerHTML = ""; // Clear previous content
+                phraseData.forEach(item => {
+                    const span = document.createElement('span');
+                    span.className = 'word';
+                    span.textContent = item.phrase;
+                    const fontSize = (item.count / maxCount) * 60 + 10;
+                    span.style.fontSize = `${fontSize}px`;
+                    span.addEventListener('click', () => showPopup(item, totalPhrases));
+                    wordCloud.appendChild(span);
+                });
+            } catch (e) {
+                console.error(e);
+                wordCloud.innerHTML = `<div id="error-message">${e.message}</div>`;
+            }
+        }
+
+        // Show popup with stats
+        function showPopup(item, totalPhrases) {
+            const popup = document.getElementById('popup');
+            const overlay = document.getElementById('overlay');
+            const title = document.getElementById('popup-title');
+            const content = document.getElementById('popup-content');
+
+            title.textContent = item.phrase;
+            content.innerHTML = `
+                <strong>Occurrences:</strong> ${item.count} times<br>
+                <strong>Percentage:</strong> ${(item.count / totalPhrases * 100).toFixed(2)}%<br>
+                <strong>Rank:</strong> ${window.phraseData.findIndex(p => p.phrase === item.phrase) + 1}
+            `;
+
+            popup.style.display = 'block';
+            overlay.style.display = 'block';
+        }
+
+        // Close popup
+        document.getElementById('popup-close').addEventListener('click', () => {
+            document.getElementById('popup').style.display = 'none';
+            document.getElementById('overlay').style.display = 'none';
+        });
+        document.getElementById('overlay').addEventListener('click', () => {
+            document.getElementById('popup').style.display = 'none';
+            document.getElementById('overlay').style.display = 'none';
+        });
+
+        // Initialize and set up filters
+        async function initialize() {
+            const bibleData = await fetchBibleData();
+            displayPhrases(bibleData); // Initial display
+            document.getElementById('apply-filters').addEventListener('click', () => displayPhrases(bibleData));
+        }
+
+        initialize();
+    </script>
+</body>
+</html>
