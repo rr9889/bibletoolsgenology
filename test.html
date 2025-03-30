@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Most Used Words in the Bible</title>
+    <title>Most Used Words in the Bible (KJV)</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -82,95 +82,48 @@
     </div>
 
     <script>
-        // API fetch functions with redundancy
-        const apiSources = [
-            {
-                name: "Holy Bible API",
-                async fetchText() {
-                    const books = await (await fetch('https://bible-go-api.rkeplin.com/v1/books')).json();
-                    let text = "";
-                    for (const book of books.slice(0, 2)) { // Limit for demo; remove slice for full Bible
-                        const chapters = await (await fetch(`https://bible-go-api.rkeplin.com/v1/books/${book.id}/chapters?translation=KJV`)).json();
-                        for (const chapter of chapters) {
-                            const verses = await (await fetch(`https://bible-go-api.rkeplin.com/v1/books/${book.id}/chapters/${chapter.id}?translation=KJV`)).json();
-                            verses.forEach(verse => text += verse.text + " ");
-                        }
-                    }
-                    return text;
-                }
-            },
-            {
-                name: "Bible SuperSearch API",
-                async fetchText() {
-                    const books = ["Gen", "Exod"]; // Limit for demo; expand for full Bible
-                    let text = "";
-                    for (const book of books) {
-                        const data = await (await fetch(`https://api.biblesupersearch.com/api?bible=kjv&reference=${book}`)).json();
-                        if (data.results) {
-                            data.results.forEach(passage => {
-                                Object.values(passage.verses.kjv).forEach(chapter => {
-                                    Object.values(chapter).forEach(verse => text += verse.text + " ");
-                                });
-                            });
-                        }
-                    }
-                    return text;
-                }
-            },
-            {
-                name: "Bible API",
-                async fetchText() {
-                    const books = ["GEN", "EXO"]; // Limit for demo; expand for full Bible
-                    let text = "";
-                    for (const book of books) {
-                        const data = await (await fetch(`https://bibleapi.co/api/verses/kjv/${book}`)).json();
-                        data.forEach(verse => text += verse.text + " ");
-                    }
-                    return text;
-                }
+        // Fetch Bible JSON from GitHub
+        async function fetchBibleData() {
+            try {
+                const response = await fetch('https://raw.githubusercontent.com/thiagobodruk/bible/master/json/en_kjv.json');
+                if (!response.ok) throw new Error('Failed to fetch Bible JSON');
+                return await response.json();
+            } catch (e) {
+                throw new Error('Could not load Bible data: ' + e.message);
             }
-        ];
+        }
 
-        // Process text into word frequencies
-        function processText(text) {
+        // Process Bible JSON into word frequencies
+        function processBibleData(bibleData) {
+            let text = "";
+            bibleData.forEach(book => {
+                book.chapters.forEach(chapter => {
+                    chapter.forEach(verse => {
+                        text += verse + " ";
+                    });
+                });
+            });
+
             const words = text.toLowerCase()
-                .replace(/[^\w\s]/g, '')
+                .replace(/[^\w\s]/g, '') // Remove punctuation
                 .split(/\s+/)
-                .filter(word => word.length > 2);
+                .filter(word => word.length > 2); // Filter short words
+
             const wordCount = {};
-            words.forEach(word => wordCount[word] = (wordCount[word] || 0) + 1);
+            words.forEach(word => {
+                wordCount[word] = (wordCount[word] || 0) + 1;
+            });
+
             return Object.entries(wordCount)
                 .map(([word, count]) => ({ word, count }))
                 .sort((a, b) => b.count - a.count)
-                .slice(0, 10);
+                .slice(0, 10); // Top 10 words
         }
 
-        // Fetch word data with redundancy
+        // Fetch and process word data
         async function fetchWordData() {
-            // Try precomputed JSON first
-            try {
-                const response = await fetch('word-frequencies.json');
-                if (response.ok) {
-                    console.log("Using precomputed JSON data");
-                    return await response.json();
-                }
-            } catch (e) {
-                console.log("Precomputed JSON not found, trying APIs...");
-            }
-
-            // Try each API in sequence
-            for (const api of apiSources) {
-                try {
-                    console.log(`Attempting ${api.name}...`);
-                    const text = await api.fetchText();
-                    if (text) return processText(text);
-                } catch (e) {
-                    console.error(`${api.name} failed:`, e);
-                }
-            }
-
-            // If all fail, throw an error
-            throw new Error("All API sources failed and no precomputed data available.");
+            const bibleData = await fetchBibleData();
+            return processBibleData(bibleData);
         }
 
         // Display words
@@ -180,21 +133,21 @@
                 const wordData = await fetchWordData();
                 window.wordData = wordData; // Store globally for popup access
                 const maxCount = Math.max(...wordData.map(w => w.count));
-                const totalWords = wordData.reduce((sum, item) => sum + item.count, 0); // Sample total; use 788258 for full KJV
+                const totalWords = 788258; // Total words in KJV
 
                 wordCloud.innerHTML = ""; // Clear previous content
                 wordData.forEach(item => {
                     const span = document.createElement('span');
                     span.className = 'word';
                     span.textContent = item.word;
-                    const fontSize = (item.count / maxCount) * 60 + 10;
+                    const fontSize = (item.count / maxCount) * 60 + 10; // Scale 10px to 70px
                     span.style.fontSize = `${fontSize}px`;
                     span.addEventListener('click', () => showPopup(item, totalWords));
                     wordCloud.appendChild(span);
                 });
             } catch (e) {
                 console.error(e);
-                wordCloud.innerHTML = '<div id="error-message">Failed to load word data. Please try again later or provide a precomputed word-frequencies.json file.</div>';
+                wordCloud.innerHTML = `<div id="error-message">${e.message}</div>`;
             }
         }
 
@@ -208,7 +161,7 @@
             title.textContent = item.word;
             content.innerHTML = `
                 <strong>Occurrences:</strong> ${item.count} times<br>
-                <strong>Percentage:</strong> ${(item.count / totalWords * 100).toFixed(2)}% (sample data)<br>
+                <strong>Percentage:</strong> ${(item.count / totalWords * 100).toFixed(2)}%<br>
                 <strong>Rank:</strong> ${window.wordData.findIndex(w => w.word === item.word) + 1}
             `;
 
