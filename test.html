@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Most Used Words in the Bible (NIV)</title>
+    <title>Most Used Biblical Names, Locations, and Terms (NIV)</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -100,10 +100,10 @@
         <input type="number" id="word-count" min="1" value="50" style="width: 60px;">
         <br>
         <label for="include-words">Include Words (comma-separated):</label>
-        <input type="text" id="include-words" placeholder="e.g., lord, god">
+        <input type="text" id="include-words" placeholder="e.g., jesus, jerusalem">
         <br>
         <label for="exclude-words">Exclude Words (comma-separated):</label>
-        <input type="text" id="exclude-words" placeholder="e.g., the, and">
+        <input type="text" id="exclude-words" placeholder="e.g., day, time">
         <br>
         <button id="apply-filters">Apply Filters</button>
     </div>
@@ -127,33 +127,33 @@
             }
         }
 
-        // Process Bible JSON into word frequencies with filters
+        // Process Bible JSON into word frequencies, filtering for names, locations, and glossary terms
         function processBibleData(bibleData, wordLimit, includeWords, excludeWords) {
-            // Default stop words with additional exclusions
-            const defaultStopWords = new Set([
-                "the", "and", "that", "shall", "for", "unto", "his", "they", "him",
-                "in", "of", "to", "he", "was", "is", "it", "with", "be", "not",
-                "all", "have", "thou", "thy", "ye", "from", "upon", "which",
-                "but", "as", "are", "were", "their", "this", "my", "me", "by",
-                "said", "will", "out", "on", "into", "when", "then", "them",
-                "her", "there", "at", "had", "you", "do", "so", "an", "or",
-                "against", "shalt", "hand", "let", "made", "saying", "went",
-                "even", "now", "behold", "every", "saith", "after", "because",
-                "these", "therefore", "things", "our"
+            // Sample glossary of biblical names, locations, and key terms
+            const biblicalGlossary = new Set([
+                // Names (People)
+                "jesus", "moses", "abraham", "david", "solomon", "joseph", "mary", "paul", "peter", "john",
+                "isaac", "jacob", "sarah", "noah", "samuel", "elijah", "elisha", "daniel", "jonah", "adam",
+                "eve", "cain", "abel", "esau", "ruth", "esther", "job", "isaiah", "jeremiah", "ezekiel",
+                // Locations
+                "jerusalem", "egypt", "israel", "judah", "babylon", "canaan", "bethlehem", "nazareth", "galilee",
+                "samaria", "sinai", "jordan", "zion", "gilead", "moab", "edom", "philistia", "syria", "assyria",
+                "persia", "gaza", "hebron", "damascus", "capernaum", "bethel", "joppa", "tyre", "sidon",
+                // Key Biblical Terms
+                "god", "lord", "spirit", "covenant", "sin", "grace", "faith", "salvation", "kingdom", "heaven",
+                "hell", "priest", "prophet", "king", "temple", "altar", "sacrifice", "law", "mercy", "judgment",
+                "peace", "love", "hope", "truth", "righteousness", "blessing", "curse", "sabbath", "church"
             ]);
 
             // Custom filters
             const includeSet = includeWords ? new Set(includeWords.split(',').map(w => w.trim().toLowerCase())) : null;
-            const excludeSet = excludeWords ? new Set(excludeWords.split(',').map(w => w.trim().toLowerCase())) : defaultStopWords;
+            const excludeSet = excludeWords ? new Set(excludeWords.split(',').map(w => w.trim().toLowerCase())) : new Set();
 
             let text = "";
-            // Iterate over books
             for (const book in bibleData) {
                 const chapters = bibleData[book];
-                // Iterate over chapters
                 for (const chapter in chapters) {
                     const verses = chapters[chapter];
-                    // Iterate over verses
                     for (const verse in verses) {
                         text += verses[verse] + " ";
                     }
@@ -163,8 +163,8 @@
             const words = text.toLowerCase()
                 .replace(/[^\w\s]/g, '')
                 .split(/\s+/)
-                .filter(word => word.length > 2 && (!excludeSet.has(word) || (includeSet && includeSet.has(word))))
-                .filter(word => !includeSet || includeSet.has(word)); // If includeSet exists, only keep those words
+                .filter(word => word.length > 2)
+                .filter(word => (biblicalGlossary.has(word) || (includeSet && includeSet.has(word))) && !excludeSet.has(word));
 
             const wordCount = {};
             words.forEach(word => {
