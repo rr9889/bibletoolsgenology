@@ -1,39 +1,50 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
 body {
   font-family: Arial, sans-serif;
-  background-color: #f5f5f5;
+  background-color: #f8f4e5;
   color: #4a2c0d;
-  margin: 0;
   padding: 20px;
+  line-height: 1.6;
 }
 
 header {
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: 30px;
 }
 
 h1 {
   color: #8b5a2b;
+  font-size: 2.5em;
 }
 
 .controls {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 20px;
+  gap: 15px;
   margin-bottom: 20px;
+  background-color: #fff;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
-.search-container {
+.search-bar {
   display: flex;
   gap: 10px;
 }
 
-#search {
+#search-input {
   padding: 10px;
   width: 300px;
-  font-size: 16px;
   border: 1px solid #ddd;
   border-radius: 4px;
+  font-size: 16px;
 }
 
 #search-btn {
@@ -61,22 +72,25 @@ h1 {
 }
 
 .filters select {
-  padding: 5px;
+  padding: 8px;
   border: 1px solid #ddd;
   border-radius: 4px;
+  font-size: 14px;
 }
 
 .results {
-  margin-bottom: 20px;
+  max-width: 800px;
+  margin: 0 auto 20px;
 }
 
 .result-item {
-  padding: 10px;
   background-color: #fff;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  padding: 10px;
   margin-bottom: 5px;
+  border-radius: 4px;
+  border: 1px solid #ddd;
   cursor: pointer;
+  transition: background-color 0.2s;
 }
 
 .result-item:hover {
@@ -84,31 +98,47 @@ h1 {
 }
 
 .profile {
+  max-width: 800px;
+  margin: 0 auto;
   background-color: #fff;
   padding: 20px;
+  border-radius: 8px;
   border: 1px solid #ddd;
-  border-radius: 4px;
-  margin-bottom: 20px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.profile h2 {
+  color: #8b5a2b;
+  margin-bottom: 15px;
+}
+
+.profile p {
+  margin: 5px 0;
 }
 
 #relationship-graph {
   text-align: center;
-  margin-bottom: 20px;
+  margin: 20px 0;
 }
 
-/* Collapsible Section */
+#relationship-graph h3 {
+  color: #8b5a2b;
+  margin-bottom: 10px;
+}
+
+/* Collapsible Sections */
 .collapsible {
   background-color: #f1f1f1;
   color: #4a2c0d;
   cursor: pointer;
-  padding: 10px;
+  padding: 12px;
   width: 100%;
   border: none;
   text-align: left;
-  outline: none;
   font-size: 16px;
   font-weight: bold;
   border-radius: 4px;
+  margin-top: 10px;
 }
 
 .collapsible:hover {
@@ -124,61 +154,57 @@ h1 {
   float: right;
 }
 
-.collapsible-content {
+.content {
   display: none;
-  padding: 0 18px;
+  padding: 10px 15px;
   background-color: #f9f9f9;
   border-left: 2px solid #8b5a2b;
   max-height: 300px;
   overflow-y: auto;
 }
 
-.collapsible-content ul {
-  list-style-type: none;
+.content ul {
+  list-style: none;
   padding: 0;
 }
 
-.collapsible-content li {
-  margin: 10px 0;
-  padding: 10px;
-  border-bottom: 1px solid #ddd;
+.content li {
+  padding: 10px 0;
+  border-bottom: 1px solid #eee;
 }
 
-/* Modal for Verse Text */
+/* Modal */
 .modal {
   display: none;
   position: fixed;
-  z-index: 1;
+  z-index: 1000;
   left: 0;
   top: 0;
   width: 100%;
   height: 100%;
-  overflow: auto;
-  background-color: rgba(0,0,0,0.4);
+  background-color: rgba(0, 0, 0, 0.5);
 }
 
 .modal-content {
-  background-color: #fefefe;
+  background-color: #fff;
   margin: 15% auto;
   padding: 20px;
-  border: 1px solid #888;
-  width: 80%;
+  border-radius: 8px;
+  width: 90%;
   max-width: 500px;
-  border-radius: 4px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
 }
 
 .close {
   color: #aaa;
   float: right;
-  font-size: 28px;
+  font-size: 24px;
   font-weight: bold;
+  cursor: pointer;
 }
 
-.close:hover,
-.close:focus {
-  color: black;
-  text-decoration: none;
-  cursor: pointer;
+.close:hover {
+  color: #000;
 }
 
 /* Links */
@@ -192,18 +218,27 @@ h1 {
 }
 
 /* Responsive Design */
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .controls {
     flex-direction: column;
     align-items: center;
   }
 
-  #search {
+  .search-bar {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  #search-input {
     width: 100%;
   }
 
   .filters {
     flex-direction: column;
     gap: 10px;
+  }
+
+  .filters select {
+    width: 100%;
   }
 }
