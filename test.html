@@ -147,9 +147,18 @@
             const excludeSet = excludeWords ? new Set(excludeWords.split(',').map(w => w.trim().toLowerCase())) : defaultStopWords;
 
             let text = "";
-            bibleData.forEach(verse => {
-                text += verse.text + " ";
-            });
+            // Iterate over books
+            for (const book in bibleData) {
+                const chapters = bibleData[book];
+                // Iterate over chapters
+                for (const chapter in chapters) {
+                    const verses = chapters[chapter];
+                    // Iterate over verses
+                    for (const verse in verses) {
+                        text += verses[verse] + " ";
+                    }
+                }
+            }
 
             const words = text.toLowerCase()
                 .replace(/[^\w\s]/g, '')
