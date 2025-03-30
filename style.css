@@ -1,38 +1,24 @@
-/* Reset default styles */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+body {
   font-family: Arial, sans-serif;
-}
-
-/* Container for the entire layout */
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
   background-color: #f5f5f5;
+  color: #4a2c0d;
+  margin: 0;
+  padding: 20px;
 }
 
-/* Header */
 h1 {
   text-align: center;
-  color: #4a2c0d;
-  margin-bottom: 20px;
+  color: #8b5a2b;
 }
 
-/* Search Section */
-.search-section {
-  display: flex;
-  justify-content: center;
+.search-container {
+  text-align: center;
   margin-bottom: 20px;
 }
 
 #search {
   padding: 10px;
   width: 300px;
-  border: 2px solid #8b5a2b;
-  border-radius: 5px 0 0 5px;
   font-size: 16px;
 }
 
@@ -41,7 +27,6 @@ h1 {
   background-color: #8b5a2b;
   color: white;
   border: none;
-  border-radius: 0 5px 5px 0;
   cursor: pointer;
   font-size: 16px;
 }
@@ -50,8 +35,7 @@ h1 {
   background-color: #4a2c0d;
 }
 
-/* Results Section */
-.results-section {
+#results {
   margin-bottom: 20px;
 }
 
@@ -61,40 +45,26 @@ h1 {
   border: 1px solid #ddd;
   margin-bottom: 5px;
   cursor: pointer;
-  border-radius: 5px;
 }
 
 .result-item:hover {
-  background-color: #f1f1f1;
+  background-color: #f0f0f0;
 }
 
-/* Profile Section */
-.profile-section {
+.profile {
+  display: none;
   background-color: #fff;
   padding: 20px;
-  border-radius: 5px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  border: 1px solid #ddd;
   margin-bottom: 20px;
-  display: none; /* Hidden by default */
 }
 
-.profile-section.active {
-  display: block; /* Shown when a person is selected */
+.profile.active {
+  display: block;
 }
 
-.profile-section h2 {
-  color: #4a2c0d;
-  margin-bottom: 15px;
-}
-
-.profile-section p {
-  margin: 5px 0;
-  color: #333;
-}
-
-.profile-section h3 {
-  margin-top: 15px;
-  color: #8b5a2b;
+#family-tree {
+  text-align: center;
 }
 
 /* Collapsible Section */
@@ -109,7 +79,6 @@ h1 {
   outline: none;
   font-size: 16px;
   font-weight: bold;
-  border-radius: 5px;
 }
 
 .collapsible:hover {
@@ -141,33 +110,4 @@ h1 {
   margin: 10px 0;
   padding: 10px;
   border-bottom: 1px solid #ddd;
-}
-
-/* Family Tree Section */
-.family-tree-section {
-  background-color: #fff;
-  padding: 20px;
-  border-radius: 5px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  text-align: center;
-}
-
-.family-tree-section svg {
-  width: 100%;
-  height: auto;
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-  .container {
-    padding: 10px;
-  }
-
-  #search {
-    width: 200px;
-  }
-
-  .profile-section, .family-tree-section {
-    padding: 10px;
-  }
 }
